@@ -30,7 +30,7 @@ IF (WIN32)
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\SIM\\Coin3D\\2;Installation Path]/include"
     )
 
-    FIND_LIBRARY(COIN3D_LIBRARY_DEBUG coin2d
+    FIND_LIBRARY(COIN3D_LIBRARY_DEBUG coin4d
       "[HKEY_LOCAL_MACHINE\\SOFTWARE\\SIM\\Coin3D\\2;Installation Path]/lib"
     )
 

@@ -20,7 +20,7 @@ FIND_PATH(XercesC_INCLUDE_DIRS xercesc/dom/DOM.hpp
 FIND_LIBRARY(XercesC_LIBRARIES
   NAMES
     xerces-c
-    xerces-c_3
+    xerces-c_3D
   PATHS
     ${CMAKE_LIBRARY_PATH}
     "[HKEY_CURRENT_USER\\software\\xerces-c\\lib]"

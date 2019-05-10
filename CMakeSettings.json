@@ -1,0 +1,131 @@
+{
+  "configurations": [
+    {
+      "name": "x64-Debug",
+      "generator": "Visual Studio 15 2017 Win64",
+      "configurationType": "Debug",
+      "inheritEnvironments": [
+        "msvc_x64_x64"
+      ],
+      "buildRoot": "${projectDir}\\..\\FreeCAD-vs2017-build\\${name}\\",
+      "installRoot": "${projectDir}\\..\\FreeCAD-vs2017-install\\${name}",
+      "variables": [
+        {
+          "name": "FREECAD_LIBPACK_USE",
+          "value": "OFF"
+        },
+        {
+          "name": "BUILD_FEM",
+          "value": "OFF"
+        },
+        {
+          "name": "BUILD_MESH_PART",
+          "value": "OFF"
+        },
+        {
+          "name": "BUILD_OPENSCAD",
+          "value": "OFF"
+        },
+        {
+          "name": "BUILD_PATH",
+          "value": "OFF"
+        },
+        {
+          "name": "BUILD_QT5",
+          "value": "ON"
+        },
+        {
+          "name": "BOOST_ROOT",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\boost\\boost_1_68_0"
+        },
+        {
+          "name": "XercesC_INCLUDE_DIRS",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\XercesC\\XercesC-vs2017-install\\x64-Debug\\include"
+        },
+        {
+          "name": "XercesC_LIBRARIES",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\XercesC\\XercesC-vs2017-install\\x64-Debug\\lib"
+        },
+        {
+          "name": "ZLIB_ROOT",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\opencascade\\3rdParty\\zlib-1.2.8-vc14-64"
+        },
+        {
+          "name": "FREETYPE_INCLUDE_DIR_ft2build",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\opencascade\\3rdParty\\freetype-2.5.5-vc14-64\\include"
+        },
+        {
+          "name": "FREETYPE_INCLUDE_DIR_freetype2",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\opencascade\\3rdParty\\freetype-2.5.5-vc14-64\\include"
+        },
+        {
+          "name": "FREETYPE_LIBRARY_RELEASE",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\opencascade\\3rdParty\\freetype-2.5.5-vc14-64\\lib"
+        },
+        {
+          "name": "OCC_INCLUDE_DIR",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\opencascade\\opencascade-7.3.0\\inc"
+        },
+        {
+          "name": "OCC_LIBRARY",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\opencascade\\opencascade-7.3.0\\win64\\vc14\\libd"
+        },
+        {
+          "name": "EIGEN3_INCLUDE_DIR",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\eigen3\\eigen-eigen-3.3.7"
+        },
+        {
+          "name": "Qt5Core_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5Core"
+        },
+        {
+          "name": "Qt5Network_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5Network"
+        },
+        {
+          "name": "Qt5Xml_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5Xml"
+        },
+        {
+          "name": "Qt5Widgets_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5Widgets"
+        },
+        {
+          "name": "Qt5PrintSupport_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5PrintSupport"
+        },
+        {
+          "name": "Qt5OpenGL_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5OpenGL"
+        },
+        {
+          "name": "Qt5Svg_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5Svg"
+        },
+        {
+          "name": "Qt5UiTools_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5UiTools"
+        },
+        {
+          "name": "Qt5Concurrent_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5Concurrent"
+        },
+        {
+          "name": "Qt5WebEngineWidgets_DIR",
+          "value": "C:\\Qt\\Qt5.10.1\\5.10.1\\msvc2017_64\\lib\\cmake\\Qt5WebEngineWidgets"
+        },
+        {
+          "name": "COIN3D_INCLUDE_DIRS",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\Coin3D-vs2017-install\\x64-Debug\\include"
+        },
+        {
+          "name": "COIN3D_LIBRARY_DEBUG",
+          "value": "${projectDir}\\..\\FreeCAD-LibPack\\Coin3D-vs2017-install\\x64-Debug\\lib"
+        }
+      ],
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": ""
+    }
+  ]
+}
