@@ -26,6 +26,7 @@ if(COMMAND cmake_policy)
     if (POLICY CMP0072)
         cmake_policy(SET CMP0072 OLD)
     endif(POLICY CMP0072)
+	cmake_policy(SET CMP0074 OLD)
 endif(COMMAND cmake_policy)
 
 find_program(CCACHE_PROGRAM ccache)  #This check should occur before project()

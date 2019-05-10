@@ -17,6 +17,18 @@ FIND_PATH(XercesC_INCLUDE_DIRS xercesc/dom/DOM.hpp
   /usr/include
 )
 
+FIND_LIBRARY(XercesC_DEBUG_LIBRARIES
+  NAMES
+    xerces-c_3D
+  PATHS
+    ${CMAKE_LIBRARY_PATH}
+    "[HKEY_CURRENT_USER\\software\\xerces-c\\lib]"
+    "[HKEY_CURRENT_USER\\xerces-c\\lib]"
+    $ENV{XERCESCROOT}/${LIB_DESTINATION}
+    /usr/local/${LIB_DESTINATION}
+    /usr/${LIB_DESTINATION}
+)
+
 FIND_LIBRARY(XercesC_LIBRARIES
   NAMES
     xerces-c
