@@ -116,7 +116,12 @@ TaskLeaderLine::TaskLeaderLine(TechDrawGui::ViewProviderLeader* leadVP) :
 
     connect(ui->pbTracker, SIGNAL(clicked(bool)),
             this, SLOT(onTrackerClicked(bool)));
-    
+    connect(ui->pbCancelEdit, SIGNAL(clicked(bool)),
+            this, SLOT(onCancelEditClicked(bool)));
+    ui->pbCancelEdit->setEnabled(false);
+
+    saveState();
+
     m_trackerMode = QGTracker::TrackerMode::Line;
 }
 
@@ -155,6 +160,9 @@ TaskLeaderLine::TaskLeaderLine(TechDraw::DrawView* baseFeat,
     
     connect(ui->pbTracker, SIGNAL(clicked(bool)),
             this, SLOT(onTrackerClicked(bool)));
+    connect(ui->pbCancelEdit, SIGNAL(clicked(bool)),
+            this, SLOT(onCancelEditClicked(bool)));
+    ui->pbCancelEdit->setEnabled(false);
 
     m_trackerMode = QGTracker::TrackerMode::Line;
 }
@@ -162,6 +170,24 @@ TaskLeaderLine::TaskLeaderLine(TechDraw::DrawView* baseFeat,
 TaskLeaderLine::~TaskLeaderLine()
 {
     delete ui;
+}
+
+void TaskLeaderLine::saveState()
+{
+    if (m_lineFeat != nullptr) {
+        m_savePoints = m_lineFeat->WayPoints.getValues();
+        m_saveX = m_lineFeat->X.getValue();
+        m_saveY = m_lineFeat->Y.getValue();
+    }
+}
+
+void TaskLeaderLine::restoreState()
+{
+    if (m_lineFeat != nullptr) {
+        m_lineFeat->WayPoints.setValues(m_savePoints);
+        m_lineFeat->X.setValue(m_saveX);
+        m_lineFeat->Y.setValue(m_saveY);
+    }
 }
 
 void TaskLeaderLine::updateTask()
@@ -190,7 +216,8 @@ void TaskLeaderLine::setUiPrimary()
     }
     ui->pbTracker->setText(QString::fromUtf8("Pick points"));
     ui->pbTracker->setEnabled(true);
-    int aSize = getPrefArrowStyle() + 1;
+    ui->pbCancelEdit->setEnabled(true);
+   int aSize = getPrefArrowStyle() + 1;
     ui->cboxStartSym->setCurrentIndex(aSize);
 }
 
@@ -214,6 +241,7 @@ void TaskLeaderLine::setUiEdit()
         ui->cboxEndSym->setCurrentIndex(m_lineFeat->EndSymbol.getValue() + 1);
         ui->pbTracker->setText(QString::fromUtf8("Edit points"));
         ui->pbTracker->setEnabled(true);
+        ui->pbCancelEdit->setEnabled(true);
     }
 
     if (m_lineVP != nullptr) {
@@ -247,7 +275,14 @@ void TaskLeaderLine::createLeaderFeature(std::vector<Base::Vector3d> converted)
     }
     if (obj->isDerivedFrom(TechDraw::DrawLeaderLine::getClassTypeId())) {
         m_lineFeat = static_cast<TechDraw::DrawLeaderLine*>(obj);
-        commonFeatureUpdate(converted);
+        m_lineFeat->setPosition(Rez::appX(m_attachPoint.x),Rez::appX(- m_attachPoint.y), true);
+        if (!converted.empty()) {
+            m_lineFeat->WayPoints.setValues(converted);
+            if (m_lineFeat->AutoHorizontal.getValue()) {
+                m_lineFeat->adjustLastSegment();
+            }
+        }
+        commonFeatureUpdate();
     }
     
     Gui::Command::updateActive();
@@ -255,11 +290,12 @@ void TaskLeaderLine::createLeaderFeature(std::vector<Base::Vector3d> converted)
     m_lineFeat->requestPaint();
 }
 
-void TaskLeaderLine::updateLeaderFeature(std::vector<Base::Vector3d> converted)
+void TaskLeaderLine::updateLeaderFeature(void)
 {
-//    Base::Console().Message("TTL::updateLeaderFeature(%d)\n",converted.size());
+//    Base::Console().Message("TTL::updateLeaderFeature()\n");
     Gui::Command::openCommand("Edit Leader");
-    commonFeatureUpdate(converted);
+    //waypoints & x,y are updated by QGILeaderLine (for edits only!)
+    commonFeatureUpdate();
     App::Color ac;
     ac.setValue<QColor>(ui->cpLineColor->color());
     m_lineVP->Color.setValue(ac);
@@ -270,16 +306,8 @@ void TaskLeaderLine::updateLeaderFeature(std::vector<Base::Vector3d> converted)
     m_lineFeat->requestPaint();
 }
 
-void TaskLeaderLine::commonFeatureUpdate(std::vector<Base::Vector3d> converted)
+void TaskLeaderLine::commonFeatureUpdate(void)
 {
-//    Base::Console().Message("TTL::commonFeatureUpdate()\n");
-    m_lineFeat->setPosition(Rez::appX(m_attachPoint.x),Rez::appX(- m_attachPoint.y), true);
-    if (!converted.empty()) {
-        m_lineFeat->WayPoints.setValues(converted);
-        if (m_lineFeat->AutoHorizontal.getValue()) {
-            m_lineFeat->adjustLastSegment();
-        }
-    }
     int start = ui->cboxStartSym->currentIndex() - 1;
     int end   = ui->cboxEndSym->currentIndex() - 1;
     m_lineFeat->StartSymbol.setValue(start);
@@ -319,26 +347,35 @@ void TaskLeaderLine::onTrackerClicked(bool b)
     Q_UNUSED(b);
 //    Base::Console().Message("TTL::onTrackerClicked() m_pbTrackerState: %d\n",
 //                            m_pbTrackerState);
-    if (m_pbTrackerState == TRACKERCANCEL) {
-        removeTracker();
+    if ( (m_pbTrackerState == TRACKERSAVE) &&
+         (getCreateMode())  ){
+        if (m_tracker != nullptr) {
+            m_tracker->terminateDrawing();
+        }
 
         m_pbTrackerState = TRACKERPICK;
         ui->pbTracker->setText(QString::fromUtf8("Pick Points"));
+        ui->pbCancelEdit->setEnabled(false);
         enableTaskButtons(true);
 
         setEditCursor(Qt::ArrowCursor);
         return;
-    } else if (m_pbTrackerState == TRACKERCANCELEDIT) {
-        abandonEditSession();
+    } else  if ( (m_pbTrackerState == TRACKERSAVE) &&
+                 (!getCreateMode()) ) {
+        if (m_qgLine != nullptr) {
+            m_qgLine->closeEdit();
+        }
 
-        m_pbTrackerState = TRACKEREDIT;
-        ui->pbTracker->setText(QString::fromUtf8("Edit points"));
+        m_pbTrackerState = TRACKERPICK;
+        ui->pbTracker->setText(QString::fromUtf8("Pick Points"));
+        ui->pbCancelEdit->setEnabled(false);
         enableTaskButtons(true);
 
         setEditCursor(Qt::ArrowCursor);
         return;
     }
-    
+
+    //TRACKERPICK or TRACKEREDIT
     if (getCreateMode()) {
         m_inProgressLock = true;
         m_saveContextPolicy = m_mdi->contextMenuPolicy();
@@ -350,9 +387,10 @@ void TaskLeaderLine::onTrackerClicked(bool b)
         QString msg = tr("Pick a starting point for leader line");
         getMainWindow()->statusBar()->show();
         Gui::getMainWindow()->showMessage(msg,3000);
-        ui->pbTracker->setText(QString::fromUtf8("Escape picking"));
+        ui->pbTracker->setText(QString::fromUtf8("Save Points"));
         ui->pbTracker->setEnabled(true);
-        m_pbTrackerState = TRACKERCANCEL;
+        ui->pbCancelEdit->setEnabled(true);
+        m_pbTrackerState = TRACKERSAVE;
         enableTaskButtons(false);
     } else {    //edit mode
         m_trackerPoints = m_lineFeat->WayPoints.getValues();
@@ -370,26 +408,19 @@ void TaskLeaderLine::onTrackerClicked(bool b)
                 //now what? throw will generate "unknown unhandled exception"
             } else {
                 m_qgLine = qgLead;
-                connect(qgLead, SIGNAL(editComplete(std::vector<QPointF>, QGIView*)),
-                this, SLOT(onPointEditComplete(std::vector<QPointF>, QGIView*)));
-
-                m_attachPoint = Rez::guiX(Base::Vector3d(m_lineFeat->X.getValue(),  //don't need this?
-                                               -m_lineFeat->Y.getValue(),
-                                               0.0));
+                connect(qgLead, SIGNAL(editComplete()),
+                this, SLOT(onPointEditComplete()));
                 qgLead->startPathEdit();
                 QString msg = tr("Click and drag markers to adjust leader line");
                 getMainWindow()->statusBar()->show();
                 Gui::getMainWindow()->showMessage(msg,3000);
-                msg = tr("ESC or RMB to exit");
-                getMainWindow()->statusBar()->show();
-                Gui::getMainWindow()->showMessage(msg,3000);
-                ui->pbTracker->setText(QString::fromUtf8("Escape edit"));
+                ui->pbTracker->setText(QString::fromUtf8("Save changes"));
                 ui->pbTracker->setEnabled(true);
-                m_pbTrackerState = TRACKERCANCELEDIT;
+                ui->pbCancelEdit->setEnabled(true);
+                m_pbTrackerState = TRACKERSAVE;
                 enableTaskButtons(false);
             }
         } else { // need to recreate leaderline
-            // same as create mode??
             m_inProgressLock = true;
             m_saveContextPolicy = m_mdi->contextMenuPolicy();
             m_mdi->setContextMenuPolicy(Qt::PreventContextMenu);
@@ -400,12 +431,13 @@ void TaskLeaderLine::onTrackerClicked(bool b)
             QString msg = tr("Pick a starting point for leader line");
             getMainWindow()->statusBar()->show();
             Gui::getMainWindow()->showMessage(msg,3000);
-            ui->pbTracker->setText(QString::fromUtf8("Escape picking"));
+            ui->pbTracker->setText(QString::fromUtf8("Save changes"));
             ui->pbTracker->setEnabled(true);
-            m_pbTrackerState = TRACKERCANCEL;
+            ui->pbCancelEdit->setEnabled(true);
+            m_pbTrackerState = TRACKERSAVE;
             enableTaskButtons(false);
         }
-    } //end edit mode
+    }
 }
 
 void TaskLeaderLine::startTracker(void)
@@ -433,20 +465,35 @@ void TaskLeaderLine::startTracker(void)
 
 void TaskLeaderLine::onTrackerFinished(std::vector<QPointF> pts, QGIView* qgParent)
 {
-//    Base::Console().Message("TTL::onTrackerFinished()\n");
+//    Base::Console().Message("TTL::onTrackerFinished() - parent: %X\n",qgParent);
     if (pts.empty()) {
         Base::Console().Error("TaskLeaderLine - no points available\n");
         return;
     }
-    QGIView* qgiv = dynamic_cast<QGIView*>(qgParent);
-    if (qgiv != nullptr) {
-        m_qgParent = qgiv;
+
+    if (qgParent == nullptr) {
+        //do something;
+        m_qgParent = findParentQGIV();
+    } else {
+        QGIView* qgiv = dynamic_cast<QGIView*>(qgParent);
+        if (qgiv != nullptr) {
+            m_qgParent = qgiv;
+        } else {
+            Base::Console().Message("TTL::onTrackerFinished - can't find parent graphic!\n");
+            //blow up!?
+            throw Base::RuntimeError("TaskLeaderLine - can not find parent graphic");
+        }
     }
+
     if (m_qgParent != nullptr) {
         double scale = m_qgParent->getScale();
         QPointF mapped = m_qgParent->mapFromScene(pts.front()) / scale;
         m_attachPoint = Base::Vector3d(mapped.x(), mapped.y(), 0.0);
-        convertTrackerPoints(pts);
+        trackerPointsFromQPoints(pts);
+    } else {
+        Base::Console().Message("TTL::onTrackerFinished - can't find parent graphic!\n");
+        //blow up!?
+        throw Base::RuntimeError("TaskLeaderLine - can not find parent graphic");
     }
 
     QString msg = tr("Press OK or Cancel to continue");
@@ -457,6 +504,7 @@ void TaskLeaderLine::onTrackerFinished(std::vector<QPointF> pts, QGIView* qgPare
     m_tracker->sleep(true);
     m_inProgressLock = false;
     ui->pbTracker->setEnabled(false);
+    ui->pbCancelEdit->setEnabled(false);
     enableTaskButtons(true);
     setEditCursor(Qt::ArrowCursor);
 }
@@ -472,6 +520,38 @@ void TaskLeaderLine::removeTracker(void)
     }
 }
 
+void TaskLeaderLine::onCancelEditClicked(bool b)
+{
+    Q_UNUSED(b);
+//    Base::Console().Message("TTL::onCancelEditClicked() m_pbTrackerState: %d\n",
+//                            m_pbTrackerState);
+    abandonEditSession();
+    if (m_lineFeat != nullptr) {
+        m_lineFeat->requestPaint();
+    }
+
+    m_pbTrackerState = TRACKEREDIT;
+    ui->pbTracker->setText(QString::fromUtf8("Edit points"));
+    ui->pbCancelEdit->setEnabled(false);
+    enableTaskButtons(true);
+
+    m_inProgressLock = false;
+    setEditCursor(Qt::ArrowCursor);
+}
+
+QGIView* TaskLeaderLine::findParentQGIV()
+{
+    QGIView* result = nullptr;
+    if (m_baseFeat != nullptr) {
+        Gui::ViewProvider* gvp = QGIView::getViewProvider(m_baseFeat);
+        ViewProviderDrawingView* vpdv = dynamic_cast<ViewProviderDrawingView*>(gvp);
+        if (vpdv != nullptr) {
+            result = vpdv->getQView();
+        }
+    }
+    return result;
+}
+
 void TaskLeaderLine::setEditCursor(QCursor c)
 {
     if (m_baseFeat != nullptr) {
@@ -481,9 +561,9 @@ void TaskLeaderLine::setEditCursor(QCursor c)
 }
 
 //from 1:1 scale scene QPointF to zero origin Vector3d points
-void TaskLeaderLine::convertTrackerPoints(std::vector<QPointF> pts)
+void TaskLeaderLine::trackerPointsFromQPoints(std::vector<QPointF> pts)
 {
-//    Base::Console().Message("TTL::convertTrackerPoints(%d)\n", pts.size());
+//    Base::Console().Message("TTL::trackerPointsFromQPoints(%d)\n", pts.size());
     m_trackerPoints.clear();
     for (auto& p: pts) {
         QPointF mapped = p - pts.front();
@@ -493,42 +573,22 @@ void TaskLeaderLine::convertTrackerPoints(std::vector<QPointF> pts)
 }
 
 //******************************************************************************
-void TaskLeaderLine::onPointEditComplete(std::vector<QPointF> pts, QGIView* parent)
+//void TaskLeaderLine::onPointEditComplete(std::vector<QPointF> pts, QGIView* parent)
+void TaskLeaderLine::onPointEditComplete(void)
 {
-//    Base::Console().Message("TTL::onPointEditComplete(%d)\n", pts.size());
-    if (pts.empty()) {
-        return;
-    }
-    QPointF p0 = pts.front();
-
-    if (parent == nullptr) {
-//        Base::Console().Message("TTL::onPointEditComplete - passed parent is NULL!\n");
-    } else {
-        m_qgParent = parent;
-//        double scale = m_qgParent->getScale();
-        if ( !(TechDraw::DrawUtil::fpCompare(p0.x(),0.0) &&
-               TechDraw::DrawUtil::fpCompare(p0.y(),0.0))  )  {
-            //p0 was moved. need to change AttachPoint and intervals from p0
-            QPointF mapped = m_qgParent->mapFromItem(m_qgLine,p0);
-            m_attachPoint = Base::Vector3d(mapped.x(),mapped.y(),0.0);
-            for (auto& p : pts) {
-                p -= p0;
-            }
-            pts.at(0) = QPointF(0.0,0.0);
-        }
-
-        convertTrackerPoints(pts);
-    }
+//    Base::Console().Message("TTL::onPointEditComplete()\n");
     m_inProgressLock = false;
     
     m_pbTrackerState = TRACKEREDIT;
     ui->pbTracker->setText(QString::fromUtf8("Edit points"));
     ui->pbTracker->setEnabled(true);
+    ui->pbCancelEdit->setEnabled(true);
     enableTaskButtons(true);
 }
 
 void TaskLeaderLine::abandonEditSession(void)
 {
+//    Base::Console().Message("TTL::abandonEditSession()\n");
     if (m_qgLine != nullptr) {
         m_qgLine->abandonEdit();
     }
@@ -540,6 +600,7 @@ void TaskLeaderLine::abandonEditSession(void)
     ui->pbTracker->setText(QString::fromUtf8("Edit points"));
     enableTaskButtons(true);
     ui->pbTracker->setEnabled(true);
+    ui->pbCancelEdit->setEnabled(false);
 
     setEditCursor(Qt::ArrowCursor);
 }
@@ -571,8 +632,9 @@ bool TaskLeaderLine::accept()
 {
 //    Base::Console().Message("TTL::accept()\n");
     if (m_inProgressLock) {
-//        Base::Console().Message("TTL::accept - edit in progress!!\n");
+        //accept() button shouldn't be available if there is an edit in progress.
         abandonEditSession();
+        removeTracker();
         return true;
     }
 
@@ -580,13 +642,16 @@ bool TaskLeaderLine::accept()
     if (!doc) return false;
 
     if (!getCreateMode())  {
-        updateLeaderFeature(m_trackerPoints);
+//        removeTracker();
+        updateLeaderFeature();
     } else {
-        removeTracker();
+//        removeTracker();
         createLeaderFeature(m_trackerPoints);
     }
     m_mdi->setContextMenuPolicy(m_saveContextPolicy);
     m_trackerMode = QGTracker::TrackerMode::None;
+    removeTracker();
+
     Gui::Command::doCommand(Gui::Command::Gui,"Gui.ActiveDocument.resetEdit()");
 
     return true;
@@ -596,6 +661,7 @@ bool TaskLeaderLine::reject()
 {
     if (m_inProgressLock) {
 //        Base::Console().Message("TTL::reject - edit in progress!!\n");
+        //reject() button shouldn't be available if there is an edit in progress.
         abandonEditSession();
         removeTracker();
         return false;
@@ -611,7 +677,14 @@ bool TaskLeaderLine::reject()
         (m_lineFeat != nullptr) )  {
         removeFeature();
     }
+
+    if (!getCreateMode() &&
+        (m_lineFeat != nullptr) )  {
+        restoreState();
+    }
+
     m_trackerMode = QGTracker::TrackerMode::None;
+    removeTracker();
 
     //make sure any dangling objects are cleaned up 
     Gui::Command::doCommand(Gui::Command::Gui,"App.activeDocument().recompute()");

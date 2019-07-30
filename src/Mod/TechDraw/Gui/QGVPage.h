@@ -20,11 +20,12 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAWINGGUI_CANVASVIEW_H
-#define DRAWINGGUI_CANVASVIEW_H
+#ifndef TECHDRAWGUI_QGVIEW_H
+#define TECHDRAWGUI_QGVIEW_H
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
+#include <QLabel>
 
 class QTemporaryFile;
 
@@ -93,14 +94,12 @@ public:
     void addLeaderToParent(QGILeaderLine* lead, QGIView* parent);
 
 //    const std::vector<QGIView *> & getViews() const { return views; }    //only used in MDIVP
-    std::vector<QGIView *> getViews() const;   //only used in MDIVP
+    std::vector<QGIView *> getViews() const;
 
     int addQView(QGIView * view);
     int removeQView(QGIView *view);
     int removeQViewByName(const char* name);
     void removeQViewFromScene(QGIView *view);
-
-    void balloonPlacing(bool val) { m_balloonPlacing = val; };
 
     //void setViews(const std::vector<QGIView *> &view) {views = view; }
     void setPageTemplate(TechDraw::DrawTemplate *pageTemplate);
@@ -110,14 +109,15 @@ public:
 
     TechDraw::DrawPage * getDrawPage();
 
-    void toggleMarkers(bool enable);
     void toggleHatch(bool enable);
+    virtual void refreshViews(void);
+
 
     /// Renders the page to SVG with filename.
     void saveSvg(QString filename);
-    void postProcessXml(QTemporaryFile* tempFile, QString filename, QString pagename);
+    void postProcessXml(QTemporaryFile& tempFile, QString filename, QString pagename);
 
-    int balloonIndex;
+/*    int balloonIndex;*/
 
 public Q_SLOTS:
     void setHighQualityAntialiasing(bool highQualityAntialiasing);
@@ -130,6 +130,7 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void kbPanScroll(int xMove = 1, int yMove = 1); 
 
@@ -139,7 +140,6 @@ protected:
     
 
     QGITemplate *pageTemplate;
-//    std::vector<QGIView *> views;                          //<<< why?  scene already has a list of all the views.
 
 private:
     RendererType m_renderer;
@@ -154,9 +154,12 @@ private:
     double m_zoomIncrement;
     int m_reversePan;
     int m_reverseScroll;
-    bool m_balloonPlacing;
+/*    bool m_borderState;*/
+    QLabel *balloonCursor;
+    QPoint balloonCursorPos;
+    void cancelBalloonPlacing(void);
 };
 
-} // namespace MDIViewPageGui
+} // namespace 
 
-#endif // DRAWINGGUI_CANVASVIEW_H
+#endif // TECHDRAWGUI_QGVIEW_H

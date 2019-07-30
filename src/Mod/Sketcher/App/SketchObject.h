@@ -38,6 +38,8 @@
 
 #include "Sketch.h"
 
+#include "SketchGeometryExtension.h"
+
 namespace Sketcher
 {
 
@@ -178,6 +180,13 @@ public:
     int getDriving(int ConstrId, bool &isdriving);
     /// toggle the driving status of this constraint
     int toggleDriving(int ConstrId);
+
+    /// set the driving status of this constraint and solve
+    int setActive(int ConstrId, bool isactive);
+    /// get the driving status of this constraint
+    int getActive(int ConstrId, bool &isactive);
+    /// toggle the driving status of this constraint
+    int toggleActive(int ConstrId);
 
     /// Make all dimensionals Driving/non-Driving
     int setDatumsDriving(bool isdriving);

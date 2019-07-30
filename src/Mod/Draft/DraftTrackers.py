@@ -505,7 +505,7 @@ class arcTracker(Tracker):
         self.recompute()
 
     def getAngle(self,pt):
-        "returns the angle of a given vector"
+        "returns the angle of a given vector in radians"
         c = self.trans.translation.getValue()
         center = Vector(c[0],c[1],c[2])
         rad = pt.sub(center)
@@ -514,7 +514,7 @@ class arcTracker(Tracker):
         return(a)
 
     def getAngles(self):
-        "returns the start and end angles"
+        "returns the start and end angles in degrees"
         return(self.startangle,self.endangle)
                 
     def setStartPoint(self,pt):
@@ -530,6 +530,21 @@ class arcTracker(Tracker):
         ap = math.degrees(ang)
         self.endangle = self.startangle + ap
         self.recompute()
+
+    def setBy3Points(self,p1,p2,p3):
+        "sets the arc by three points"
+        import Part
+        try:
+            arc=Part.ArcOfCircle(p1,p2,p3)
+        except: return
+        e=arc.toShape()
+        self.autoinvert = False
+        self.normal = e.Curve.Axis.negative() # axis is always in wrong direction
+        self.basevector = self.getDeviation()
+        self.setCenter(e.Curve.Center)
+        self.setRadius(e.Curve.Radius)
+        self.setStartPoint(p1)
+        self.setEndPoint(p3)
 
     def recompute(self):
         import Part,re
@@ -570,7 +585,7 @@ class arcTracker(Tracker):
                 self.sep.addChild(self.circle)
             else:
                 FreeCAD.Console.PrintWarning("arcTracker.recompute() failed to read-in Inventor string\n")
-            
+
 
 class ghostTracker(Tracker):
     '''A Ghost tracker, that allows to copy whole object representations.
@@ -736,7 +751,7 @@ class PlaneTracker(Tracker):
         # getting screen distance
         p1 = Draft.get3DView().getPoint((100,100))
         p2 = Draft.get3DView().getPoint((110,100))
-        bl = (p2.sub(p1)).Length * (Draft.getParam("snapRange",5)/2)
+        bl = (p2.sub(p1)).Length * (Draft.getParam("snapRange", 8)/2)
         pick = coin.SoPickStyle()
         pick.style.setValue(coin.SoPickStyle.UNPICKABLE)
         self.trans = coin.SoTransform()
@@ -805,10 +820,16 @@ class wireTracker(Tracker):
                 p = wire.Vertexes[0].Point
                 self.coords.point.set1Value(t,[p.x,p.y,p.z])
 
+    def updateFromPointlist(self,points,forceclosed=False):
+        if points:
+            for i in range(len(points)):
+                p=points[i]
+                self.coords.point.set1Value(i,[p.x,p.y,p.z])
+
 class gridTracker(Tracker):
     "A grid tracker"
     def __init__(self):
-        col = [0.2,0.2,0.3]
+        col = self.getGridColor()
         pick = coin.SoPickStyle()
         pick.style.setValue(coin.SoPickStyle.UNPICKABLE)
         self.trans = coin.SoTransform()
@@ -843,6 +864,13 @@ class gridTracker(Tracker):
         s.addChild(self.lines3)
         Tracker.__init__(self,children=[s],name="gridTracker")
         self.reset()
+
+    def getGridColor(self):
+        color = Draft.getParam("gridColor", 842157055)
+        r = ((color>>24)&0xFF)/255
+        g = ((color>>16)&0xFF)/255
+        b = ((color>>8)&0xFF)/255
+        return [r, g, b]
 
     def update(self):
         "redraws the grid"
@@ -1045,11 +1073,8 @@ class archDimTracker(Tracker):
         elif m == 3:
             self.Distance = (DraftVecUtils.project(p2.sub(p1),Vector(0,1,0))).Length
         else:
-            self.Distance = (p2.sub(p1)).Length 
-        if not text:
-            text = Draft.getParam("dimPrecision",2)
-            text = "%."+str(text)+"f"
-            text = (text % self.Distance)
+            self.Distance = (p2.sub(p1)).Length
+        text = FreeCAD.Units.Quantity(self.Distance,FreeCAD.Units.Length).UserString
         self.dimnode.string.setValue(text)
         
     def setMode(self,mode=1):

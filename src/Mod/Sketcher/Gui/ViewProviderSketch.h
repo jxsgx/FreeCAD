@@ -50,6 +50,7 @@ class SoPointSet;
 class SoTransform;
 class SoLineSet;
 class SoMarkerSet;
+class SoPickedPoint;
 
 class SoImage;
 class QImage;
@@ -387,6 +388,7 @@ protected:
     static SbColor SelectColor;
     static SbColor PreselectSelectedColor;
     static SbColor InformationColor;
+    static SbColor DeactivatedConstrDimColor;
 
     static SbTime prvClickTime;
     static SbVec2s prvClickPos; //used by double-click-detector

@@ -77,7 +77,7 @@ public:
     TechDraw::DrawView * getViewObject() const;
     double getScale(void);
 
-    virtual void toggleBorder(bool state = true);
+    virtual bool getFrameState(void);
     virtual void toggleCache(bool state);
     virtual void updateView(bool update = false);
     virtual void drawBorder(void);
@@ -111,10 +111,17 @@ public:
     
     static Gui::ViewProvider* getViewProvider(App::DocumentObject* obj);
     static QGVPage* getGraphicsView(TechDraw::DrawView* dv);
+    static int calculateFontPixelSize(double sizeInMillimetres);
+    static const double DefaultFontSizeInMM;
+
     MDIViewPage* getMDIViewPage(void) const;
+
     // Mouse handling
     virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
     boost::signals2::signal<void (QGIView*, QPointF)> signalSelectPoint;
+
+public Q_SLOTS:
+    virtual void onSourceChange(TechDraw::DrawView* newParent);
 
 protected:
     QGIView* getQGIVByName(std::string name);
@@ -130,6 +137,8 @@ protected:
 
     QString getPrefFont(void);
     double getPrefFontSize(void);
+    double getDimFontSize(void);
+
     Base::Reference<ParameterGrp> getParmGroupCol(void);
 
     TechDraw::DrawView *viewObj;
@@ -139,8 +148,6 @@ protected:
     //std::string alignMode;
     //QGIView* alignAnchor;
     bool m_locked;
-    bool borderVisible;
-    bool m_visibility;
     bool m_innerView;                                                  //View is inside another View
 
     QPen m_pen;

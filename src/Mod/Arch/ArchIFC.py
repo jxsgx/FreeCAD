@@ -41,8 +41,11 @@ def getIfcProduct(IfcType):
     "Returns an IFC product name from an obj.IfcType"
     
     name = "Ifc" + IfcType.replace(" ", "")
+    if IfcType == "Undefined":
+        name = "IfcBuildingElementProxy"
     if name in ArchIFCSchema.IfcProducts:
         return ArchIFCSchema.IfcProducts[name]
+    return None
 
 def getIfcProductAttribute(ifcProduct, name):
     
@@ -79,6 +82,8 @@ def addIfcProductAttribute(obj, attribute):
     
     "Adds a given attribute property"
     
+    if not hasattr(obj,"IfcData"):
+        return
     IfcData = obj.IfcData
     if "attributes" not in IfcData:
         IfcData["attributes"] = "{}"
@@ -98,32 +103,39 @@ def addIfcAttributeValueExpressions(obj, attribute):
     
     "Binds the given attribute properties with expressions"
 
+    if not attribute["name"] in obj.PropertiesList:
+        return
     if obj.getGroupOfProperty(attribute["name"]) != "IFC Attributes":
         return
     if attribute["name"] == "OverallWidth":
-        if hasattr(obj, "Length"):
+        if "Length" in obj.PropertiesList:
             obj.setExpression("OverallWidth", "Length.Value")
-        elif hasattr(obj, "Width"):
+        elif "Width" in obj.PropertiesList:
             obj.setExpression("OverallWidth", "Width.Value")
-        elif obj.Shape.BoundBox.XLength > obj.Shape.BoundBox.YLength:
+        elif obj.Shape and (obj.Shape.BoundBox.XLength > obj.Shape.BoundBox.YLength):
             obj.setExpression("OverallWidth", "Shape.BoundBox.XLength")
-        else:
+        elif obj.Shape:
             obj.setExpression("OverallWidth", "Shape.BoundBox.YLength")
     elif attribute["name"] == "OverallHeight":
-        if hasattr(obj, "Height"):
+        if "Height" in obj.PropertiesList:
             obj.setExpression("OverallHeight", "Height.Value")
         else:
             obj.setExpression("OverallHeight", "Shape.BoundBox.ZLength")
     elif attribute["name"] == "ElevationWithFlooring":
-        obj.setExpression("ElevationWithFlooring", "Shape.BoundBox.ZMin")
+        if "Shape" in obj.PropertiesList:
+            obj.setExpression("ElevationWithFlooring", "Shape.BoundBox.ZMin")
     elif attribute["name"] == "Elevation":
-        obj.setExpression("Elevation", "Placement.Base.z")
+        if "Placement" in obj.PropertiesList:
+            obj.setExpression("Elevation", "Placement.Base.z")
     elif attribute["name"] == "NominalDiameter":
-        obj.setExpression("NominalDiameter", "Diameter.Value")
+        if "Diameter" in obj.PropertiesList:
+            obj.setExpression("NominalDiameter", "Diameter.Value")
     elif attribute["name"] == "BarLength":
-        obj.setExpression("BarLength", "Length.Value")
+        if "Length" in obj.PropertiesList:
+            obj.setExpression("BarLength", "Length.Value")
     elif attribute["name"] == "RefElevation":
-        obj.setExpression("RefElevation", "Elevation.Value")
+        if "Elevation" in obj.PropertiesList:
+            obj.setExpression("RefElevation", "Elevation.Value")
     elif attribute["name"] == "LongName":
         obj.LongName = obj.Label
 

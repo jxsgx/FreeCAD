@@ -68,6 +68,15 @@ def translate(ctx,txt):
 arrowtypes = ["Dot","Circle","Arrow","Tick","Tick-2"]
 
 #---------------------------------------------------------------------------
+# Backwards compatibility
+#---------------------------------------------------------------------------
+
+import DraftLayer
+_VisGroup = DraftLayer.Layer
+_ViewProviderVisGroup = DraftLayer.ViewProviderLayer
+makeLayer = DraftLayer.makeLayer
+
+#---------------------------------------------------------------------------
 # General functions
 #---------------------------------------------------------------------------
 
@@ -99,7 +108,8 @@ def getParamType(param):
                  "dimstyle","gridSize"]:
         return "int"
     elif param in ["constructiongroupname","textfont","patternFile","template",
-                   "snapModes","FontFile","ClonePrefix","labeltype"]:
+                   "snapModes","FontFile","ClonePrefix","labeltype"] \
+        or "inCommandShortcut" in param:
         return "string"
     elif param in ["textheight","tolerance","gridSpacing","arrowsize","extlines","dimspacing",
                    "dimovershoot","extovershoot"]:
@@ -109,7 +119,7 @@ def getParamType(param):
                    "renderPolylineWidth","showPlaneTracker","UsePartPrimitives","DiscretizeEllipses",
                    "showUnit"]:
         return "bool"
-    elif param in ["color","constructioncolor","snapcolor"]:
+    elif param in ["color","constructioncolor","snapcolor","gridColor"]:
         return "unsigned"
     else:
         return None
@@ -122,6 +132,8 @@ def getParam(param,default=None):
     if t == "int":
         if default == None:
             default = 0
+        if param == "linewidth":
+            return FreeCAD.ParamGet("User parameter:BaseApp/Preferences/View").GetInt("DefaultShapeLineWidth",default)
         return p.GetInt(param,default)
     elif t == "string":
         if default == None:
@@ -138,6 +150,8 @@ def getParam(param,default=None):
     elif t == "unsigned":
         if default == None:
             default = 0
+        if param == "color":
+            return FreeCAD.ParamGet("User parameter:BaseApp/Preferences/View").GetUnsigned("DefaultShapeLineColor",default)
         return p.GetUnsigned(param,default)
     else:
         return None
@@ -146,11 +160,22 @@ def setParam(param,value):
     "setParam(parameterName,value): sets a Draft parameter with the given value"
     p = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Draft")
     t = getParamType(param)
-    if t == "int": p.SetInt(param,value)
-    elif t == "string": p.SetString(param,value)
-    elif t == "float": p.SetFloat(param,value)
-    elif t == "bool": p.SetBool(param,value)
-    elif t == "unsigned": p.SetUnsigned(param,value)
+    if t == "int":
+        if param == "linewidth":
+            FreeCAD.ParamGet("User parameter:BaseApp/Preferences/View").SetInt("DefaultShapeLineWidth",value)
+        else:
+            p.SetInt(param,value)
+    elif t == "string":
+        p.SetString(param,value)
+    elif t == "float":
+        p.SetFloat(param,value)
+    elif t == "bool":
+        p.SetBool(param,value)
+    elif t == "unsigned":
+        if param == "color":
+            FreeCAD.ParamGet("User parameter:BaseApp/Preferences/View").SetUnsigned("DefaultShapeLineColor",value)
+        else:
+            p.SetUnsigned(param,value)
 
 def precision():
     "precision(): returns the precision value from Draft user settings"
@@ -216,8 +241,9 @@ def get3DView():
     if FreeCAD.GuiUp:
         import FreeCADGui
         v = FreeCADGui.ActiveDocument.ActiveView
-        if str(type(v)) == "<type 'View3DInventorPy'>":
+        if "View3DInventor" in str(type(v)):
             return v
+        print("Debug: Draft: Warning, not working in active view")
         v = FreeCADGui.ActiveDocument.mdiViewsOfType("Gui::View3DInventor")
         if v:
             return v[0]
@@ -1327,21 +1353,6 @@ def makeEllipse(majradius,minradius,placement=None,face=True,support=None):
 
     return obj
 
-def makeVisGroup(group=None,name="VisGroup"):
-    '''makeVisGroup([group]): creates a VisGroup object in the given group, or in the
-    active document if no group is given'''
-    if not FreeCAD.ActiveDocument:
-        FreeCAD.Console.PrintError("No active document. Aborting\n")
-        return
-    obj = FreeCAD.ActiveDocument.addObject("App::DocumentObjectGroupPython",name)
-    _VisGroup(obj)
-    if FreeCAD.GuiUp:
-        _ViewProviderVisGroup(obj.ViewObject)
-        formatObject(obj)
-    if group:
-        group.addObject(obj)
-    return obj
-
 def extrude(obj,vector,solid=False):
     '''makeExtrusion(object,vector): extrudes the given object
     in the direction given by the vector. The original object
@@ -1847,13 +1858,14 @@ def scale(objectslist,scale=Vector(1,1,1),center=Vector(0,0,0),copy=False):
             m = FreeCAD.Matrix()
             m.move(obj.Placement.Base.negative())
             m.move(center.negative())
-            m.multiply(scale)
+            m.scale(scale.x,scale.y,scale.z)
             m.move(center)
             m.move(obj.Placement.Base)
             scaled_shape = scaled_shape.transformGeometry(m)
-        if getType(obj) == "Rectangled":
+        if getType(obj) == "Rectangle":
             p = []
-            for v in scaled_shape.Vertexes: p.append(v.Point)
+            for v in scaled_shape.Vertexes: 
+                p.append(v.Point)
             pl = obj.Placement.copy()
             pl.Base = p[0]
             diag = p[2].sub(p[0])
@@ -2611,7 +2623,7 @@ def makeShapeString(String,FontFile,Size = 100,Tracking = 0):
         obrep = obj.ViewObject
         if "PointSize" in obrep.PropertiesList: obrep.PointSize = 1             # hide the segment end points
         select(obj)
-
+    obj.recompute()
     return obj
 
 def clone(obj,delta=None,forcedraft=False):
@@ -2623,6 +2635,7 @@ def clone(obj,delta=None,forcedraft=False):
     even if the input object is an Arch object.'''
 
     prefix = getParam("ClonePrefix","")
+    cl = None
     if prefix:
         prefix = prefix.strip()+" "
     if not isinstance(obj,list):
@@ -2636,29 +2649,36 @@ def clone(obj,delta=None,forcedraft=False):
         if getType(obj[0]) == "BuildingPart":
             cl = Arch.makeComponent()
         else:
-            cl = getattr(Arch,"make"+obj[0].Proxy.Type)()
-        base = getCloneBase(obj[0])
-        cl.Label = prefix + base.Label
-        cl.CloneOf = base
-        if hasattr(cl,"Material") and hasattr(obj[0],"Material"):
-            cl.Material = obj[0].Material
-        if getType(obj[0]) != "BuildingPart":
-            cl.Placement = obj[0].Placement
-        try:
-            cl.Role = base.Role
-            cl.Description = base.Description
-            cl.Tag = base.Tag
-        except:
-            pass
-        if gui:
-            formatObject(cl,base)
-            cl.ViewObject.DiffuseColor = base.ViewObject.DiffuseColor
-            if getType(obj[0]) in ["Window","BuildingPart"]:
-                from DraftGui import todo
-                todo.delay(Arch.recolorize,cl)
-        select(cl)
-        return cl
-    else:
+            try:
+                clonfunc = getattr(Arch,"make"+obj[0].Proxy.Type)
+            except:
+                pass # not a standard Arch object... Fall back to Draft mode
+            else:
+                cl = clonefunc()
+        if cl:
+            base = getCloneBase(obj[0])
+            cl.Label = prefix + base.Label
+            cl.CloneOf = base
+            if hasattr(cl,"Material") and hasattr(obj[0],"Material"):
+                cl.Material = obj[0].Material
+            if getType(obj[0]) != "BuildingPart":
+                cl.Placement = obj[0].Placement
+            try:
+                cl.Role = base.Role
+                cl.Description = base.Description
+                cl.Tag = base.Tag
+            except:
+                pass
+            if gui:
+                formatObject(cl,base)
+                cl.ViewObject.DiffuseColor = base.ViewObject.DiffuseColor
+                if getType(obj[0]) in ["Window","BuildingPart"]:
+                    from DraftGui import todo
+                    todo.delay(Arch.recolorize,cl)
+            select(cl)
+            return cl
+    # fall back to Draft clone mode
+    if not cl:
         cl = FreeCAD.ActiveDocument.addObject("Part::FeaturePython","Clone")
         cl.addExtension("Part::AttachExtensionPython", None)
         cl.Label = prefix + obj[0].Label
@@ -2668,7 +2688,7 @@ def clone(obj,delta=None,forcedraft=False):
     cl.Objects = obj
     if delta:
         cl.Placement.move(delta)
-    elif len(obj) == 1:
+    elif (len(obj) == 1) and hasattr(obj[0],"Placement"):
         cl.Placement = obj[0].Placement
     formatObject(cl,obj[0])
     if hasattr(cl,"LongName") and hasattr(obj[0],"LongName"):
@@ -5285,6 +5305,7 @@ class _BezCurve(_DraftObject):
         obj.addProperty("App::PropertyIntegerList","Continuity","Draft",QT_TRANSLATE_NOOP("App::Property","Continuity"))
         obj.addProperty("App::PropertyBool","Closed","Draft",QT_TRANSLATE_NOOP("App::Property","If the Bezier curve should be closed or not"))
         obj.addProperty("App::PropertyBool","MakeFace","Draft",QT_TRANSLATE_NOOP("App::Property","Create a face if this curve is closed"))
+        obj.addProperty("App::PropertyLength","Length","Draft",QT_TRANSLATE_NOOP("App::Property","The length of this object"))
         obj.addProperty("App::PropertyArea","Area","Draft",QT_TRANSLATE_NOOP("App::Property","The area of this object"))
         obj.MakeFace = getParam("fillmode",True)
         obj.Closed = False
@@ -5355,8 +5376,10 @@ class _BezCurve(_DraftObject):
                 except Part.OCCError:
                     pass
             fp.Shape = w
-            if hasattr(obj,"Area") and hasattr(w,"Area"):
-                obj.Area = w.Area
+            if hasattr(fp,"Area") and hasattr(w,"Area"):
+                fp.Area = w.Area
+            if hasattr(fp,"Length") and hasattr(w,"Length"):
+                fp.Length = w.Length            
         fp.Placement = plm
 
     @classmethod
@@ -5753,13 +5776,13 @@ class _PathArray(_DraftObject):
             shape.Placement.Rotation, pathwire, count, xlate, align)
 
         base = []
-        
+
         for placement in placements:
             ns = shape.copy()
             ns.Placement = placement
 
             base.append(ns)
-            
+
         return (Part.makeCompound(base))
 
 class _PointArray(_DraftObject):
@@ -5824,8 +5847,9 @@ class _Point(_DraftObject):
 
     def execute(self, obj):
         import Part
-        shape = Part.Vertex(Vector(obj.X.Value,obj.Y.Value,obj.Z.Value))
+        shape = Part.Vertex(Vector(0,0,0))
         obj.Shape = shape
+        obj.Placement.Base = FreeCAD.Vector(obj.X.Value,obj.Y.Value,obj.Z.Value)
 
 class _ViewProviderPoint(_ViewProviderDraft):
     "A viewprovider for the Draft Point object"
@@ -6117,8 +6141,12 @@ class _ShapeString(_DraftObject):
             sep_wirelist = []
             face = Part.Face(wire2Face)
             face.validate()
-            if face.Surface.Axis.z < 0.0:
-                face.reverse()
+            try:
+                # some fonts fail here
+                if face.Surface.Axis.z < 0.0:
+                    face.reverse()
+            except:
+                pass
             compFaces.append(face)
         ret = Part.Compound(compFaces)
         return ret
@@ -6257,82 +6285,6 @@ class _ViewProviderFacebinder(_ViewProviderDraft):
     def unsetEdit(self,vobj,mode):
         FreeCADGui.Control.closeDialog()
         return False
-
-
-class _VisGroup:
-    "The VisGroup object"
-    def __init__(self,obj):
-        self.Type = "VisGroup"
-        obj.Proxy = self
-        self.Object = obj
-
-    def __getstate__(self):
-        return self.Type
-
-    def __setstate__(self,state):
-        if state:
-            self.Type = state
-
-    def execute(self,obj):
-        pass
-
-class _ViewProviderVisGroup:
-    "A View Provider for the VisGroup object"
-    def __init__(self,vobj):
-        vobj.addProperty("App::PropertyColor","LineColor","Base","")
-        vobj.addProperty("App::PropertyColor","ShapeColor","Base","")
-        vobj.addProperty("App::PropertyFloat","LineWidth","Base","")
-        vobj.addProperty("App::PropertyEnumeration","DrawStyle","Base","")
-        vobj.addProperty("App::PropertyInteger","Transparency","Base","")
-        vobj.DrawStyle = ["Solid","Dashed","Dotted","Dashdot"]
-        vobj.LineWidth = 1
-        vobj.LineColor = (0.13,0.15,0.37)
-        vobj.DrawStyle = "Solid"
-        vobj.Proxy = self
-
-    def getIcon(self):
-        import Arch_rc
-        return ":/icons/Draft_VisGroup.svg"
-
-    def attach(self,vobj):
-        self.Object = vobj.Object
-        return
-
-    def claimChildren(self):
-        return self.Object.Group
-
-    def __getstate__(self):
-        return None
-
-    def __setstate__(self,state):
-        return None
-
-    def updateData(self,obj,prop):
-        if prop == "Group":
-            if obj.ViewObject:
-                obj.ViewObject.Proxy.onChanged(obj.ViewObject,"LineColor")
-
-    def onChanged(self,vobj,prop):
-        if hasattr(vobj,"Object"):
-            if vobj.Object:
-                if hasattr(vobj.Object,"Group"):
-                    if vobj.Object.Group:
-                        for o in vobj.Object.Group:
-                            if o.ViewObject:
-                                for p in ["LineColor","ShapeColor","LineWidth","DrawStyle","Transparency"]:
-                                    if hasattr(vobj,p):
-                                        if hasattr(o.ViewObject,p):
-                                            setattr(o.ViewObject,p,getattr(vobj,p))
-                                        elif hasattr(o,p):
-                                            # for Drawing views
-                                            setattr(o,p,getattr(vobj,p))
-                                        elif (p == "DrawStyle") and hasattr(o,"LineStyle"):
-                                            # Special case in Drawing views
-                                            setattr(o,"LineStyle",getattr(vobj,p))
-                                if vobj.Object.InList:
-                                    # touch the page if something was changed
-                                    if vobj.Object.InList[0].isDerivedFrom("Drawing::FeaturePage"):
-                                        vobj.Object.InList[0].touch()
 
 
 class WorkingPlaneProxy:
@@ -6610,7 +6562,7 @@ class DraftLabel:
         if obj.LabelType == "Custom":
             if obj.CustomText:
                 obj.Text = obj.CustomText
-        elif obj.Target:
+        elif obj.Target and obj.Target[0]:
             if obj.LabelType == "Name":
                 obj.Text = [obj.Target[0].Name]
             elif obj.LabelType == "Label":
@@ -6632,18 +6584,18 @@ class DraftLabel:
                 if obj.Target[0].isDerivedFrom("Part::Feature"):
                     if hasattr(obj.Target[0].Shape,"Length"):
                         obj.Text = [FreeCAD.Units.Quantity(obj.Target[0].Shape.Length,FreeCAD.Units.Length).UserString]
-                    if "Edge" in obj.Target[1][0]:
+                    if obj.Target[1] and ("Edge" in obj.Target[1][0]):
                         obj.Text = [FreeCAD.Units.Quantity(obj.Target[0].Shape.Edges[int(obj.Target[1][0][4:])-1].Length,FreeCAD.Units.Length).UserString]
             elif obj.LabelType == "Area":
                 if obj.Target[0].isDerivedFrom("Part::Feature"):
                     if hasattr(obj.Target[0].Shape,"Area"):
-                        obj.Text = [FreeCAD.Units.Quantity(obj.Target[0].Shape.Area,FreeCAD.Units.Area).UserString]
-                    if "Face" in obj.Target[1][0]:
+                        obj.Text = [FreeCAD.Units.Quantity(obj.Target[0].Shape.Area,FreeCAD.Units.Area).UserString.replace("^2","²")]
+                    if obj.Target[1] and ("Face" in obj.Target[1][0]):
                         obj.Text = [FreeCAD.Units.Quantity(obj.Target[0].Shape.Faces[int(obj.Target[1][0][4:])-1].Area,FreeCAD.Units.Area).UserString]
             elif obj.LabelType == "Volume":
                 if obj.Target[0].isDerivedFrom("Part::Feature"):
                     if hasattr(obj.Target[0].Shape,"Volume"):
-                        obj.Text = [FreeCAD.Units.Quantity(obj.Target[0].Shape.Volume,FreeCAD.Units.Volume).UserString]
+                        obj.Text = [FreeCAD.Units.Quantity(obj.Target[0].Shape.Volume,FreeCAD.Units.Volume).UserString.replace("^3","³")]
 
     def onChanged(self,obj,prop):
         pass
@@ -6751,6 +6703,7 @@ class ViewProviderDraftLabel:
         self.onChanged(vobj,"LineColor")
         self.onChanged(vobj,"TextColor")
         self.onChanged(vobj,"ArrowSize")
+        self.onChanged(vobj,"Line")
 
     def getDisplayModes(self,vobj):
         return ["2D text","3D text"]
@@ -6778,8 +6731,12 @@ class ViewProviderDraftLabel:
                 self.text3d.justification = coin.SoAsciiText.LEFT
         elif prop == "Text":
             if obj.Text:
-                self.text2d.string.setValues([l.encode("utf8") for l in obj.Text if l])
-                self.text3d.string.setValues([l.encode("utf8") for l in obj.Text if l])
+                if sys.version_info.major >= 3:
+                    self.text2d.string.setValues([l for l in obj.Text if l])
+                    self.text3d.string.setValues([l for l in obj.Text if l])
+                else:
+                    self.text2d.string.setValues([l.encode("utf8") for l in obj.Text if l])
+                    self.text3d.string.setValues([l.encode("utf8") for l in obj.Text if l])
                 self.onChanged(obj.ViewObject,"TextAlignment")
 
     def getTextSize(self,vobj):
