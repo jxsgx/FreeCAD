@@ -773,7 +773,8 @@ PyObject* Application::sActivateWorkbenchHandler(PyObject * /*self*/, PyObject *
     }
 
     try {
-        Instance->activateWorkbench(psKey);
+        bool ok = Instance->activateWorkbench(psKey);
+        return Py::new_reference_to(Py::Boolean(ok));
     }
     catch (const Base::Exception& e) {
         std::stringstream err;
@@ -799,9 +800,6 @@ PyObject* Application::sActivateWorkbenchHandler(PyObject * /*self*/, PyObject *
         PyErr_SetString(Base::BaseExceptionFreeCADError, err.str().c_str());
         return 0;
     }
-
-    Py_INCREF(Py_None);
-    return Py_None;
 }
 
 PyObject* Application::sAddWorkbenchHandler(PyObject * /*self*/, PyObject *args)
@@ -1038,6 +1036,10 @@ PyObject* Application::sAddCommand(PyObject * /*self*/, PyObject *args)
     try {
         Base::PyGILStateLocker lock;
         Py::Module mod(PyImport_ImportModule("inspect"), true);
+        if (mod.isNull()) {
+            PyErr_SetString(PyExc_ImportError, "Cannot load inspect module");
+            return 0;
+        }
         Py::Callable inspect(mod.getAttr("stack"));
         Py::Tuple args;
         Py::List list(inspect.apply(args));

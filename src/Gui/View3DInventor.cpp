@@ -477,7 +477,9 @@ void View3DInventor::printPreview()
 {
     QPrinter printer(QPrinter::ScreenResolution);
     printer.setFullPage(true);
-    //printer.setPageSize(QPrinter::A3);
+#if (QT_VERSION > QT_VERSION_CHECK(5, 9, 0))
+    printer.setPageSize(QPrinter::A4);
+#endif
     printer.setOrientation(QPrinter::Landscape);
 
     QPrintPreviewDialog dlg(&printer, this);
@@ -964,6 +966,12 @@ bool View3DInventor::eventFilter(QObject* watched, QEvent* e)
 
 void View3DInventor::keyPressEvent (QKeyEvent* e)
 {
+    // See StdViewDockUndockFullscreen::activated()
+    // With Qt5 one cannot directly use 'setCurrentViewMode'
+    // of an MDI view because it causes rendering problems.
+    // The only reliable solution is to clone the MDI view,
+    // set its view mode and close the original MDI view.
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
     ViewMode mode = MDIView::currentViewMode();
     if (mode != Child) {
         // If the widget is in fullscreen mode then we can return to normal mode either
@@ -972,6 +980,7 @@ void View3DInventor::keyPressEvent (QKeyEvent* e)
             setCurrentViewMode(Child);
         }
     }
+#endif
 
     QMainWindow::keyPressEvent(e);
 }

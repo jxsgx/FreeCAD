@@ -8,6 +8,7 @@ include_directories(
     ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${Boost_INCLUDE_DIRS}
     ${COIN3D_INCLUDE_DIRS}
     ${PYTHON_INCLUDE_DIRS}
@@ -15,6 +16,17 @@ include_directories(
     ${ZLIB_INCLUDE_DIR}
     ${XercesC_INCLUDE_DIRS}
 )
+
+if(BUILD_QT5)
+    include_directories(
+        ${Qt5XmlPatterns_INCLUDE_DIRS}
+    )
+else(BUILD_QT5)
+    include_directories(
+        ${QT_QTXMLPATTERNS_INCLUDE_DIR}
+    )
+endif(BUILD_QT5)
+
 link_directories(${OCC_LIBRARY_DIR})
 
 set(TechDrawGui_LIBS
@@ -40,6 +52,9 @@ set(TechDrawGui_MOC_HDRS
     TaskGeomHatch.h
     TaskLeaderLine.h
     TaskRichAnno.h
+    TaskCosVertex.h
+    TaskCenterLine.h
+    TaskLineDecor.h
     QGEPath.h
     QGTracker.h
     QGILeaderLine.h
@@ -47,6 +62,7 @@ set(TechDrawGui_MOC_HDRS
     QGMText.h
     mrichtextedit.h
     mtextedit.h
+    TaskBalloon.h
 )
 
 fc_wrap_cpp(TechDrawGui_MOC_SRCS ${TechDrawGui_MOC_HDRS})
@@ -69,7 +85,13 @@ set(TechDrawGui_UIC_SRCS
     TaskLeaderLine.ui
     TaskRichAnno.ui
     mrichtextedit.ui
-    )
+    TaskBalloon.ui
+    TaskCosVertex.ui
+    TaskCenterLine.ui
+    TaskCL2Lines.ui
+    TaskLineDecor.ui
+    TaskRestoreLines.ui
+)
 
 if(BUILD_QT5)
     qt5_wrap_ui(TechDrawGui_UIC_HDRS ${TechDrawGui_UIC_SRCS})
@@ -99,6 +121,7 @@ SET(TechDrawGui_SRCS
     Command.cpp
     CommandCreateDims.cpp
     CommandDecorate.cpp
+    CommandAnnotate.cpp
     Resources/TechDraw.qrc
     PreCompiled.cpp
     PreCompiled.h
@@ -122,6 +145,9 @@ SET(TechDrawGui_SRCS
     TaskSectionView.ui
     TaskSectionView.cpp
     TaskSectionView.h
+    TaskBalloon.ui
+    TaskBalloon.cpp
+    TaskBalloon.h
     TaskGeomHatch.ui
     TaskGeomHatch.cpp
     TaskGeomHatch.h
@@ -131,6 +157,17 @@ SET(TechDrawGui_SRCS
     TaskRichAnno.ui
     TaskRichAnno.cpp
     TaskRichAnno.h
+    TaskCosVertex.ui
+    TaskCosVertex.cpp
+    TaskCosVertex.h
+    TaskCenterLine.ui
+    TaskCenterLine.cpp
+    TaskCenterLine.h
+    TaskLineDecor.ui
+    TaskLineDecor.cpp
+    TaskLineDecor.h
+    TaskRestoreLines.ui
+    TaskCL2Lines.ui
     DrawGuiUtil.cpp
     DrawGuiUtil.h
     Rez.cpp
@@ -279,7 +316,13 @@ SET(TechDrawGuiTaskDlgs_SRCS
     TaskGeomHatch.ui
     TaskLeaderLine.ui
     TaskRichAnno.ui
+    TaskCosVertex.ui
     mrichtextedit.ui
+    TaskBalloon.ui
+    TaskCenterLine.ui
+    TaskLineDecor.ui
+    TaskRestoreLines.ui
+    TaskCL2Lines.ui
 )
 SOURCE_GROUP("TaskDialogs" FILES ${TechDrawGuiTaskDlgs_SRCS})
 
@@ -304,7 +347,6 @@ fc_copy_sources(TechDrawGui "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_DATADIR}/Mod/Te
 INSTALL(FILES ${TechDrawGuiFonts} DESTINATION "${CMAKE_INSTALL_DATADIR}/Mod/TechDraw/Resources/fonts")
 
 fc_copy_sources(TechDrawGui "${CMAKE_BINARY_DIR}/src/Mod/TechDraw/Gui" ${MRTE_HDRS})
-INSTALL(FILES ${MRTE_HDRS} DESTINATION "${CMAKE_BINARY_DIR}/src/Mod/TechDraw/Gui")
 
 SET_BIN_DIR(TechDrawGui TechDrawGui /Mod/TechDraw)
 SET_PYTHON_PREFIX_SUFFIX(TechDrawGui)

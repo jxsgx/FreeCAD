@@ -38,7 +38,7 @@ namespace TechDraw {
 class DrawViewDimension;
 }
 
-namespace TechDrawGeometry {
+namespace TechDraw {
 class BaseGeom;
 class AOC;
 }
@@ -88,6 +88,10 @@ public:
     QGCustomText* getTolText(void) { return m_tolText; }
     void setTolText(QGCustomText* newTol) { m_tolText = newTol; }
 
+    double getTolAdjust(void);
+    bool hasHover;
+
+
 Q_SIGNALS:
     void dragging(bool);
     void hover(bool state);
@@ -105,13 +109,12 @@ protected:
     QGCustomText* m_dimText;
     QGCustomText* m_tolText;
     int getPrecision(void);
-    double getTolAdjust(void);
     QColor m_colNormal;
     bool m_ctrl;
 
     double posX;
     double posY;
-
+    
 private:
 };
 
@@ -129,14 +132,19 @@ public:
 
     void setViewPartFeature(TechDraw::DrawViewDimension *obj);
     int type() const override { return Type;}
-
-    virtual void drawBorder() override;
-    virtual void updateView(bool update = false) override;
+    virtual QRectF boundingRect() const override;
     virtual void paint( QPainter * painter,
                         const QStyleOptionGraphicsItem * option,
                         QWidget * widget = 0 ) override;
+
+    virtual void drawBorder() override;
+    virtual void updateView(bool update = false) override;
     virtual QColor getNormalColor(void) override;
     QString getLabelText(void);
+    void setPrettyPre(void);
+    void setPrettySel(void);
+    void setPrettyNormal(void);
+
 
 public Q_SLOTS:
     void datumLabelDragged(bool ctrl);
@@ -164,6 +172,12 @@ protected:
     //QGICMark* centerMark
     double m_lineWidth;
     bool m_obtuse;
+
+private:
+    static const double TextOffsetFudge;
+
+    double getDefaultTextHorizontalOffset(bool toLeft) const;
+    double getDefaultTextVerticalOffset() const;
 };
 
 } // namespace MDIViewPageGui

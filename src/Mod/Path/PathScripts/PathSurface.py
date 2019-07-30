@@ -58,10 +58,8 @@ from __future__ import print_function
 
 import FreeCAD
 import MeshPart
-# import Part
 import Path
 import PathScripts.PathLog as PathLog
-# import PathScripts.PathPocketBase as PathPocketBase
 import PathScripts.PathUtils as PathUtils
 import PathScripts.PathOp as PathOp
 
@@ -77,16 +75,18 @@ __doc__ = "Class and implementation of Mill Facing operation."
 __contributors__ = "roivai[FreeCAD], russ4262 (Russell Johnson)"
 __created__ = "2016"
 __scriptVersion__ = "3t Usable"
-__lastModified__ = "2019-05-02 10:44 CST"
+__lastModified__ = "2019-05-10 10:37 CST"
 
-if False:
+LOGLEVEL = False
+
+if LOGLEVEL:
     PathLog.setLevel(PathLog.Level.DEBUG, PathLog.thisModule())
     PathLog.trackModule(PathLog.thisModule())
 else:
     PathLog.setLevel(PathLog.Level.INFO, PathLog.thisModule())
 
 
-# Qt tanslation handling
+# Qt translation handling
 def translate(context, text, disambig=None):
     return QtCore.QCoreApplication.translate(context, text, disambig)
 
@@ -94,7 +94,7 @@ def translate(context, text, disambig=None):
 # OCL must be installed
 try:
     import ocl
-except:
+except ImportError:
     FreeCAD.Console.PrintError(
         translate("Path_Surface", "This operation requires OpenCamLib to be installed.") + "\n")
     import sys
@@ -113,7 +113,7 @@ class ObjectSurface(PathOp.ObjectOp):
     def baseObject(self):
         '''baseObject() ... returns super of receiver
         Used to call base implementation in overwritten functions.'''
-        return super(__class__, self)
+        return super(self.__class__, self)
 
     def opFeatures(self, obj):
         '''opFeatures(obj) ... return all standard features and edges based geomtries'''
@@ -184,13 +184,13 @@ class ObjectSurface(PathOp.ObjectOp):
         initIdx = 0.0
 
         # Instantiate additional class operation variables
-        rtn = self.resetOpVariables()
+        self.resetOpVariables()
 
         # mark beginning of operation
         self.startTime = time.time()
 
         # Set cutter for OCL based on tool controller properties
-        # rtn = self.setOclCutter(obj)
+        self.setOclCutter(obj)
 
         self.reportThis("\n-----\n-----\nBegin 3D surface operation")
         self.reportThis("Script version: " + __scriptVersion__ + "  Lm: " + __lastModified__)
@@ -297,7 +297,7 @@ class ObjectSurface(PathOp.ObjectOp):
                     t = ocl.Triangle(ocl.Point(p[0], p[1], p[2] + obj.DepthOffset.Value),
                                      ocl.Point(q[0], q[1], q[2] + obj.DepthOffset.Value),
                                      ocl.Point(r[0], r[1], r[2] + obj.DepthOffset.Value))
-                    aT = stl.addTriangle(t)
+                    stl.addTriangle(t)
                 final = self._waterlineOp(obj, stl, bb)
             elif obj.Algorithm == 'OCL Dropcutter':
                 # Create stl object via OCL
@@ -309,7 +309,7 @@ class ObjectSurface(PathOp.ObjectOp):
                     t = ocl.Triangle(ocl.Point(p[0], p[1], p[2]),
                                      ocl.Point(q[0], q[1], q[2]),
                                      ocl.Point(r[0], r[1], r[2]))
-                    aT = stl.addTriangle(t)
+                    stl.addTriangle(t)
 
                 # Rotate model back to original index
                 if obj.ScanType == 'Rotational':
@@ -479,8 +479,8 @@ class ObjectSurface(PathOp.ObjectOp):
         if ignoreWasteFlag is True:
             topoMap = createTopoMap(scanCLP, obj.IgnoreWasteDepth)
             self.topoMap = listToMultiDimensional(topoMap, numLines, pntsPerLine)
-            rtnA = self._bufferTopoMap(numLines, pntsPerLine)
-            rtnB = self._highlightWaterline(4, 1)
+            self._bufferTopoMap(numLines, pntsPerLine)
+            self._highlightWaterline(4, 1)
             self.topoMap = debufferMultiDimenList(self.topoMap)
             ignoreMap = multiDimensionalToList(self.topoMap)
 
@@ -526,7 +526,7 @@ class ObjectSurface(PathOp.ObjectOp):
                         cOut = (self.cutter.getDiameter() / 2)
                     y = ymax - cOut
                 else:
-                    y = ymin - (self.cutter.getDiameter() / 2) + ((n + 1) * cOut)  # all lines are offest by 1/2 cutter diameter
+                    y = ymin - (self.cutter.getDiameter() / 2) + ((n + 1) * cOut)  # all lines are offset by 1/2 cutter diameter
                 p1 = ocl.Point(xmin, y, 0)   # start-point of line
                 p2 = ocl.Point(xmax, y, 0)   # end-point of line
 
@@ -540,7 +540,7 @@ class ObjectSurface(PathOp.ObjectOp):
                         cOut = (self.cutter.getDiameter() / 2)
                     x = xmax - cOut
                 else:
-                    x = xmin - (self.cutter.getDiameter() / 2) + ((n + 1) * cOut)  # all lines are offest by 1/2 cutter diameter
+                    x = xmin - (self.cutter.getDiameter() / 2) + ((n + 1) * cOut)  # all lines are offset by 1/2 cutter diameter
                 p1 = ocl.Point(x, ymin, 0)   # start-point of line
                 p2 = ocl.Point(x, ymax, 0)   # end-point of line
 
@@ -568,7 +568,7 @@ class ObjectSurface(PathOp.ObjectOp):
         holdCount = 0
         holdLine = 0
         onLine = False
-        lineOfTravel = "X"
+        # lineOfTravel = "X"
         pointsOnLine = 0
         zMin = prvDep
         zMax = prvDep
@@ -603,7 +603,7 @@ class ObjectSurface(PathOp.ObjectOp):
         travVect = ocl.Point(float("inf"), float("inf"), float("inf"))
 
         # Determine if releasing model from ignore waste areas
-        if obj.ReleaseFromWaste == True:
+        if obj.ReleaseFromWaste is True:
             minIgnVal = 0
 
         # Set values for first gcode point in layer
@@ -630,7 +630,7 @@ class ObjectSurface(PathOp.ObjectOp):
             pntCount += 1
             if pntCount == 1:
                 # PathLog.debug("--Start row: " + str(rowCount))
-                nn = 1
+                pass  # nn = 1
             elif pntCount == pntsPerLine:
                 # PathLog.debug("--End row: " + str(rowCount))
                 pntCount = 0
@@ -769,8 +769,8 @@ class ObjectSurface(PathOp.ObjectOp):
                 if self.onHold is False:
                     if not optimize or not self.isPointOnLine(FreeCAD.Vector(prev.x, prev.y, prev.z), FreeCAD.Vector(nxt.x, nxt.y, nxt.z), FreeCAD.Vector(pnt.x, pnt.y, pnt.z)):
                         output.append(Path.Command('G1', {'X': pnt.x, 'Y': pnt.y, 'Z': pnt.z, 'F': self.horizFeed}))
-                    elif i == lastCLP:
-                        output.append(Path.Command('G1', {'X': pnt.x, 'Y': pnt.y, 'Z': pnt.z, 'F': self.horizFeed}))
+                    # elif i == lastCLP:
+                    #     output.append(Path.Command('G1', {'X': pnt.x, 'Y': pnt.y, 'Z': pnt.z, 'F': self.horizFeed}))
 
                 # Rotate point data
                 prev.x = pnt.x
@@ -817,7 +817,7 @@ class ObjectSurface(PathOp.ObjectOp):
         lenHP = len(self.holdStartPnts)
         commands = [Path.Command('G0', {'Z': obj.SafeHeight.Value, 'F': self.vertRapid})]
         self.reportThis("--Processing " + str(lenHP) + " HOLD optimizations---")
-        # cycle throug hold points
+        # cycle through hold points
         if lenHP > 0:
             hdCnt = 0
             lenGC = len(self.gcodeCmds)
@@ -831,7 +831,6 @@ class ObjectSurface(PathOp.ObjectOp):
                     hscType = self.holdStopTypes.pop(0)
 
                     if hscType == "End":
-                        N = None
                         # Create gcode commands to connect p1 and p2
                         hpCmds = self.holdStopEndCmds(obj, p2, "Hold Stop: End point")
                     elif hscType == "Mid":
@@ -867,7 +866,6 @@ class ObjectSurface(PathOp.ObjectOp):
         return commands
 
     def _rotationalDropCutterOp(self, obj, stl, bb):
-        eT = time.time()
         self.resetTolerance = 0.0000001  # degrees
         self.layerEndzMax = 0.0
         commands = []
@@ -878,12 +876,12 @@ class ObjectSurface(PathOp.ObjectOp):
         rings = []
         lCnt = 0
         rNum = 0
-        stepDeg = 1.1
-        layCircum = 1.1
-        begIdx = 0.0
-        endIdx = 0.0
-        arc = 0.0
-        sumAdv = 0.0
+        # stepDeg = 1.1
+        # layCircum = 1.1
+        # begIdx = 0.0
+        # endIdx = 0.0
+        # arc = 0.0
+        # sumAdv = 0.0
         bbRad = self.bbRadius
 
         def invertAdvances(advances):
@@ -905,7 +903,7 @@ class ObjectSurface(PathOp.ObjectOp):
                 rngs.append([1.1])  # Initiate new ring
                 for line in scanLines:  # extract circular set(ring) of points from scan lines
                     rngs[num].append(line[num])
-                nn = rngs[num].pop(0)
+                rngs[num].pop(0)
             return rngs
 
         def indexAdvances(arc, stepDeg):
@@ -1027,8 +1025,8 @@ class ObjectSurface(PathOp.ObjectOp):
             else:
                 if obj.CutMode == 'Conventional':
                     advances = invertAdvances(advances)
-                    rt = advances.reverse()
-                    rtn = scanLines.reverse()
+                    advances.reverse()
+                    scanLines.reverse()
 
                 # Invert advances if RotationAxis == Y
                 if obj.RotationAxis == 'Y':
@@ -1062,8 +1060,8 @@ class ObjectSurface(PathOp.ObjectOp):
 
     def _indexedDropCutScan(self, obj, stl, advances, xmin, ymin, xmax, ymax, layDep, sample):
         cutterOfst = 0.0
-        radsRot = 0.0
-        reset = 0.0
+        # radsRot = 0.0
+        # reset = 0.0
         iCnt = 0
         Lines = []
         result = None
@@ -1085,9 +1083,9 @@ class ObjectSurface(PathOp.ObjectOp):
                 # Rotate STL object using OCL method
                 radsRot = math.radians(adv)
                 if obj.RotationAxis == 'X':
-                    rStl = stl.rotate(radsRot, 0.0, 0.0)
+                    stl.rotate(radsRot, 0.0, 0.0)
                 else:
-                    rStl = stl.rotate(0.0, radsRot, 0.0)
+                    stl.rotate(0.0, radsRot, 0.0)
 
             # Set STL after rotation is made
             pdc.setSTL(stl)
@@ -1127,9 +1125,9 @@ class ObjectSurface(PathOp.ObjectOp):
         # Rotate STL object back to original position using OCL method
         reset = -1 * math.radians(sumAdv - self.resetTolerance)
         if obj.RotationAxis == 'X':
-            rStl = stl.rotate(reset, 0.0, 0.0)
+            stl.rotate(reset, 0.0, 0.0)
         else:
-            rStl = stl.rotate(0.0, reset, 0.0)
+            stl.rotate(0.0, reset, 0.0)
         self.resetTolerance = 0.0
 
         return Lines
@@ -1148,7 +1146,7 @@ class ObjectSurface(PathOp.ObjectOp):
         nxt = ocl.Point(float("inf"), float("inf"), float("inf"))
         pnt = ocl.Point(float("inf"), float("inf"), float("inf"))
 
-        # Create frist point
+        # Create first point
         pnt.x = CLP[0].x
         pnt.y = CLP[0].y
         pnt.z = CLP[0].z + float(obj.DepthOffset.Value)
@@ -1217,8 +1215,8 @@ class ObjectSurface(PathOp.ObjectOp):
             if self.onHold is False:
                 if not optimize or not self.isPointOnLine(FreeCAD.Vector(prev.x, prev.y, prev.z), FreeCAD.Vector(nxt.x, nxt.y, nxt.z), FreeCAD.Vector(pnt.x, pnt.y, pnt.z)):
                     output.append(Path.Command('G1', {'X': pnt.x, 'Y': pnt.y, 'Z': pnt.z, 'F': self.horizFeed}))
-                elif i == lastCLP:
-                    output.append(Path.Command('G1', {'X': pnt.x, 'Y': pnt.y, 'Z': pnt.z, 'F': self.horizFeed}))
+                # elif i == lastCLP:
+                #     output.append(Path.Command('G1', {'X': pnt.x, 'Y': pnt.y, 'Z': pnt.z, 'F': self.horizFeed}))
 
             # Rotate point data
             prev.x = pnt.x
@@ -1242,7 +1240,7 @@ class ObjectSurface(PathOp.ObjectOp):
         output = []
         nxtAng = 0
         zMax = 0.0
-        prev = ocl.Point(float("inf"), float("inf"), float("inf"))
+        # prev = ocl.Point(float("inf"), float("inf"), float("inf"))
         nxt = ocl.Point(float("inf"), float("inf"), float("inf"))
         pnt = ocl.Point(float("inf"), float("inf"), float("inf"))
 
@@ -1256,7 +1254,7 @@ class ObjectSurface(PathOp.ObjectOp):
         if obj.RotationAxis == 'Y':
             axisOfRot = 'B'
 
-        # Create frist point
+        # Create first point
         ang = 0.0 + obj.CutterTilt
         pnt.x = RNG[0].x
         pnt.y = RNG[0].y
@@ -1390,8 +1388,8 @@ class ObjectSurface(PathOp.ObjectOp):
             yVal = ymin + (nSL * smplInt)
             p1 = ocl.Point(xmin, yVal, fd)   # start-point of line
             p2 = ocl.Point(xmax, yVal, fd)   # end-point of line
-            l = ocl.Line(p1, p2)     # line-object
-            path.append(l)        # add the line to the path
+            path.append(ocl.Line(p1, p2))
+            # path.append(l)        # add the line to the path
         pdc.setPath(path)
         pdc.run()  # run drop-cutter on the path
 
@@ -1406,9 +1404,9 @@ class ObjectSurface(PathOp.ObjectOp):
         # Create topo map from scanLines (highs and lows)
         self.topoMap = self._createTopoMap(scanLines, layDep, lenSL, pntsPerLine)
         # Add buffer lines and columns to topo map
-        rtn = self._bufferTopoMap(lenSL, pntsPerLine)
+        self._bufferTopoMap(lenSL, pntsPerLine)
         # Identify layer waterline from OCL scan
-        rtn = self._highlightWaterline(4, 9)
+        self._highlightWaterline(4, 9)
         # Extract waterline and convert to gcode
         loopList = self._extractWaterlines(obj, scanLines, lyr, layDep)
         time.sleep(0.1)
@@ -1623,7 +1621,7 @@ class ObjectSurface(PathOp.ObjectOp):
         nxt = ocl.Point(float("inf"), float("inf"), float("inf"))
         pnt = ocl.Point(float("inf"), float("inf"), float("inf"))
 
-        # Create frist point
+        # Create first point
         pnt.x = loop[0].x
         pnt.y = loop[0].y
         pnt.z = layDep
@@ -1824,6 +1822,10 @@ class ObjectSurface(PathOp.ObjectOp):
             # Reference: https://www.fine-tools.com/halbstabfraeser.html
             # OCL -> ConeCutter::ConeCutter(diameter, angle, lengthOffset)
             self.cutter = ocl.ConeCutter(diam_1, (obj.ToolController.Tool.CuttingEdgeAngle / 2), lenOfst)
+        else:
+            # Default to standard end mill
+            self.cutter = ocl.CylCutter(diam_1, (CEH + lenOfst))
+            PathLog.info("Defaulting cutter to standard end mill.")
 
         # http://www.carbidecutter.net/products/carbide-burr-cone-shape-sm.html
         '''
@@ -1917,5 +1919,5 @@ def Create(name, obj=None):
     '''Create(name) ... Creates and returns a Surface operation.'''
     if obj is None:
         obj = FreeCAD.ActiveDocument.addObject("Path::FeaturePython", name)
-    proxy = ObjectSurface(obj, name)
+    obj.Proxy = ObjectSurface(obj, name)
     return obj

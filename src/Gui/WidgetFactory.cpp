@@ -232,6 +232,28 @@ Py::Object qt_wrapInstance(qttype object, const char* className,
     return func.apply(arguments);
 }
 
+const char* qt_identifyType(QObject* ptr, const char* pyside)
+{
+    PyObject* module = PyImport_ImportModule(pyside);
+    if (!module) {
+        std::string error = "Cannot load ";
+        error += pyside;
+        error += " module";
+        throw Py::Exception(PyExc_ImportError, error);
+    }
+
+    Py::Module qtmod(module);
+    const QMetaObject* metaObject = ptr->metaObject();
+    while (metaObject) {
+        const char* className = metaObject->className();
+        if (qtmod.getDict().hasKey(className))
+            return className;
+        metaObject = metaObject->superClass();
+    }
+
+    return nullptr;
+}
+
 void* qt_getCppPointer(const Py::Object& pyobject, const char* shiboken, const char* unwrap)
 {
     // https://github.com/PySide/Shiboken/blob/master/shibokenmodule/typesystem_shiboken.xml
@@ -475,39 +497,50 @@ bool PythonWrapper::loadWidgetsModule()
 
 void PythonWrapper::createChildrenNameAttributes(PyObject* root, QObject* object)
 {
-#if defined (HAVE_SHIBOKEN) && defined(HAVE_PYSIDE)
     Q_FOREACH (QObject* child, object->children()) {
         const QByteArray name = child->objectName().toLocal8Bit();
 
         if (!name.isEmpty() && !name.startsWith("_") && !name.startsWith("qt_")) {
             bool hasAttr = PyObject_HasAttrString(root, name.constData());
             if (!hasAttr) {
-#if defined (HAVE_SHIBOKEN2) && defined(HAVE_PYSIDE2)
-                Shiboken::AutoDecRef pyChild(Shiboken::Conversions::pointerToPython((SbkObjectType*)SbkPySide2_QtCoreTypes[SBK_QOBJECT_IDX], child));
-#else
-                Shiboken::AutoDecRef pyChild(Shiboken::Conversions::pointerToPython((SbkObjectType*)SbkPySide_QtCoreTypes[SBK_QOBJECT_IDX], child));
-#endif
+#if defined (HAVE_SHIBOKEN) && defined(HAVE_PYSIDE)
+                Shiboken::AutoDecRef pyChild(Shiboken::Conversions::pointerToPython(reinterpret_cast<SbkObjectType*>(Shiboken::SbkType<QObject>()), child));
                 PyObject_SetAttrString(root, name.constData(), pyChild);
+#elif QT_VERSION >= 0x050000
+                const char* className = qt_identifyType(child, "PySide2.QtWidgets");
+                if (!className) {
+                    if (qobject_cast<QWidget*>(child))
+                        className = "QWidget";
+                    else
+                        className = "QObject";
+                }
+
+                Py::Object pyChild(qt_wrapInstance<QObject*>(child, className, "shiboken2", "PySide2.QtWidgets", "wrapInstance"));
+                PyObject_SetAttrString(root, name.constData(), pyChild.ptr());
+#else
+                const char* className = qt_identifyType(child, "PySide.QtGui");
+                if (!className) {
+                    if (qobject_cast<QWidget*>(child))
+                        className = "QWidget";
+                    else
+                        className = "QObject";
+                }
+
+                Py::Object pyChild(qt_wrapInstance<QObject*>(child, className, "shiboken", "PySide.QtGui", "wrapInstance"));
+                PyObject_SetAttrString(root, name.constData(), pyChild.ptr());
+#endif
             }
             createChildrenNameAttributes(root, child);
         }
         createChildrenNameAttributes(root, child);
     }
-#else
-    Q_UNUSED(root);
-    Q_UNUSED(object);
-#endif
 }
 
 void PythonWrapper::setParent(PyObject* pyWdg, QObject* parent)
 {
 #if defined (HAVE_SHIBOKEN) && defined(HAVE_PYSIDE)
     if (parent) {
-#if defined (HAVE_SHIBOKEN2) && defined(HAVE_PYSIDE2)
-        Shiboken::AutoDecRef pyParent(Shiboken::Conversions::pointerToPython((SbkObjectType*)SbkPySide2_QtGuiTypes[SBK_QWIDGET_IDX], parent));
-#else
-        Shiboken::AutoDecRef pyParent(Shiboken::Conversions::pointerToPython((SbkObjectType*)SbkPySide_QtGuiTypes[SBK_QWIDGET_IDX], parent));
-#endif
+        Shiboken::AutoDecRef pyParent(Shiboken::Conversions::pointerToPython(reinterpret_cast<SbkObjectType*>(Shiboken::SbkType<QWidget>()), parent));
         Shiboken::Object::setParent(pyParent, pyWdg);
     }
 #else
@@ -680,7 +713,10 @@ Py::Object PySideUicModule::loadUiType(const Py::Tuple& args)
     str << "import pyside2uic\n"
         << "from PySide2 import QtCore, QtGui, QtWidgets\n"
         << "import xml.etree.ElementTree as xml\n"
-        << "from cStringIO import StringIO\n"
+        << "try:\n"
+        << "    from cStringIO import StringIO\n"
+        << "except:\n"
+        << "    from io import StringIO\n"
         << "\n"
         << "uiFile = \"" << file.c_str() << "\"\n"
         << "parsed = xml.parse(uiFile)\n"
@@ -691,7 +727,7 @@ Py::Object PySideUicModule::loadUiType(const Py::Tuple& args)
         << "    frame = {}\n"
         << "    pyside2uic.compileUi(f, o, indent=0)\n"
         << "    pyc = compile(o.getvalue(), '<string>', 'exec')\n"
-        << "    exec pyc in frame\n"
+        << "    exec(pyc, frame)\n"
         << "    #Fetch the base_class and form class based on their type in the xml from designer\n"
         << "    form_class = frame['Ui_%s'%form_class]\n"
         << "    base_class = eval('QtWidgets.%s'%widget_class)\n";
@@ -699,7 +735,10 @@ Py::Object PySideUicModule::loadUiType(const Py::Tuple& args)
     str << "import pysideuic\n"
         << "from PySide import QtCore, QtGui\n"
         << "import xml.etree.ElementTree as xml\n"
-        << "from cStringIO import StringIO\n"
+        << "try:\n"
+        << "    from cStringIO import StringIO\n"
+        << "except:\n"
+        << "    from io import StringIO\n"
         << "\n"
         << "uiFile = \"" << file.c_str() << "\"\n"
         << "parsed = xml.parse(uiFile)\n"
@@ -710,7 +749,7 @@ Py::Object PySideUicModule::loadUiType(const Py::Tuple& args)
         << "    frame = {}\n"
         << "    pysideuic.compileUi(f, o, indent=0)\n"
         << "    pyc = compile(o.getvalue(), '<string>', 'exec')\n"
-        << "    exec pyc in frame\n"
+        << "    exec(pyc, frame)\n"
         << "    #Fetch the base_class and form class based on their type in the xml from designer\n"
         << "    form_class = frame['Ui_%s'%form_class]\n"
         << "    base_class = eval('QtGui.%s'%widget_class)\n";

@@ -39,6 +39,7 @@
         <file>icons/arrowfilled.svg</file>
         <file>icons/arrowopen.svg</file>
         <file>icons/arrowtick.svg</file>
+        <file>icons/arrowfork.svg</file>
         <file>icons/actions/techdraw-new-default.svg</file>
         <file>icons/actions/techdraw-new-pick.svg</file>
         <file>icons/actions/techdraw-view.svg</file>
@@ -63,6 +64,15 @@
         <file>icons/actions/techdraw-mline.svg</file>
         <file>icons/actions/techdraw-textleader.svg</file>
         <file>icons/actions/techdraw-point.svg</file>
+        <file>icons/actions/techdraw-midpoint.svg</file>
+        <file>icons/actions/techdraw-quadrant.svg</file>
+        <file>icons/actions/techdraw-facecenterline.svg</file>
+        <file>icons/actions/techdraw-2linecenterline.svg</file>
+        <file>icons/actions/techdraw-2pointcenterline.svg</file>
+        <file>icons/actions/techdraw-eraser.svg</file>
+        <file>icons/actions/techdraw-linedecor.svg</file>
+        <file>icons/actions/techdraw-facedecor.svg</file>
+        <file>icons/actions/techdraw-showall.svg</file>
         <file>icons/actions/section-up.svg</file>  
         <file>icons/actions/section-down.svg</file>
         <file>icons/actions/section-left.svg</file>
@@ -75,6 +85,13 @@
         <file>icons/arrow-cw.svg</file>
         <file>icons/techdraw-lock.png</file>
         <file>icons/cursor-balloon.png</file>
+        <file>icons/none.svg</file>
+        <file>icons/circular.svg</file>
+        <file>icons/hexagon.svg</file>
+        <file>icons/inspection.svg</file>
+        <file>icons/rectangle.svg</file>
+        <file>icons/triangle.svg</file>
+        <file>icons/square.svg</file>
         <file>icons/MRTE/menu.svg</file>
         <file>icons/MRTE/bgColor.svg</file>
         <file>icons/MRTE/fgColor.svg</file>
@@ -133,4 +150,4 @@
         <file>translations/TechDraw_ar.qm</file>
         <file>translations/TechDraw_vi.qm</file>
     </qresource>
-</RCC>
+</RCC> 

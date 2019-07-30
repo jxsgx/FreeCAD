@@ -39,7 +39,6 @@
 #include <Base/Console.h>
 #include <Base/UnitsApi.h>
 
-#include "DrawView.h"
 #include "DrawPage.h"
 #include "DrawViewCollection.h"
 #include "DrawViewClip.h"
@@ -47,11 +46,14 @@
 #include "DrawProjGroupItem.h"
 #include "DrawLeaderLine.h"
 #include "DrawUtil.h"
+#include "Geometry.h"
+#include "Cosmetic.h"
 
 #include <Mod/TechDraw/App/DrawViewPy.h>  // generated from DrawViewPy.xml
 
-using namespace TechDraw;
+#include "DrawView.h"
 
+using namespace TechDraw;
 
 //===========================================================================
 // DrawView
@@ -92,6 +94,7 @@ DrawView::~DrawView()
 
 App::DocumentObjectExecReturn *DrawView::execute(void)
 {
+//    Base::Console().Message("DV::execute() - %s\n", getNameInDocument());
     handleXYLock();
     requestPaint();
     return App::DocumentObject::execute();
@@ -187,8 +190,10 @@ short DrawView::mustExecute() const
     if (!isRestoring()) {
         result  =  (Scale.isTouched()  ||
                     ScaleType.isTouched() ||
+                    Caption.isTouched() ||
                     X.isTouched() ||
-                    Y.isTouched() );
+                    Y.isTouched() ||
+                    LockPosition.isTouched());
     }
     if ((bool) result) {
         return result;
@@ -322,12 +327,6 @@ std::vector<TechDraw::DrawLeaderLine*> DrawView::getLeaders() const
     return result;
 }
 
-void DrawView::addRandomVertex(Base::Vector3d pos)
-{
-    (void) pos;
-    Base::Console().Message("DV::addRandomVertex()\n");
-}
-
 void DrawView::Restore(Base::XMLReader &reader)
 {
 // this is temporary code for backwards compat (within v0.17).  can probably be deleted once there are no development
@@ -429,6 +428,7 @@ bool DrawView::keepUpdated(void)
 
 void DrawView::requestPaint(void)
 {
+//    Base::Console().Message("DV::requestPaint() - %s\n", getNameInDocument());
     signalGuiPaint(this);
 }
 

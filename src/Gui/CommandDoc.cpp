@@ -417,6 +417,10 @@ void StdCmdNew::activated(int iMsg)
         .arg(qApp->translate("StdCmdNew","Unnamed"));
     runCommand(Command::Doc,cmd.toUtf8());
     doCommand(Command::Gui,"Gui.activeDocument().activeView().viewDefaultOrientation()");
+
+    ParameterGrp::handle hViewGrp = App::GetApplication().GetParameterGroupByPath("User parameter:BaseApp/Preferences/View");
+    if (hViewGrp->GetBool("ShowAxisCross"))
+        doCommand(Command::Gui,"Gui.ActiveDocument.ActiveView.setAxisCross(True)");
 }
 
 //===========================================================================
@@ -1420,6 +1424,7 @@ StdCmdEdit::StdCmdEdit()
     sToolTipText  = QT_TR_NOOP("Toggles the selected object's edit mode");
     sWhatsThis    = "Std_Edit";
     sStatusTip    = QT_TR_NOOP("Activates or Deactivates the selected object's edit mode");
+    sAccel        = "Shift+E";
 #if QT_VERSION >= 0x040200
     sPixmap       = "edit-edit";
 #endif

@@ -25,6 +25,11 @@
 # include <unistd.h>
 #endif
 
+#if defined(__clang__)
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wdelete-non-virtual-dtor"
+#endif
+
 #include "Base/Exception.h"
 #include <Base/Interpreter.h>
 #include <App/Application.h>
@@ -66,6 +71,11 @@
 #pragma warning(disable : 4003)
 #pragma warning(disable : 4065)
 #endif
+
+/** \defgroup Expression Expressions framework
+    \ingroup APP
+    \brief The expression system allows users to write expressions and formulas that produce values
+*/
 
 using namespace Base;
 using namespace App;
@@ -1988,3 +1998,7 @@ bool ExpressionParser::isTokenAUnit(const std::string & str)
     else
         return false;
 }
+
+#if defined(__clang__)
+# pragma clang diagnostic pop
+#endif

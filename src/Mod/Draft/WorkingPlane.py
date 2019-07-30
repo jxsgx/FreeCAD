@@ -207,7 +207,9 @@ class plane:
 
 
     def alignToCurve(self, shape, offset):
-        if shape.ShapeType == 'Edge':
+        if shape.isNull():
+            return False
+        elif shape.ShapeType == 'Edge':
             #??? TODO: process curve here.  look at shape.edges[0].Curve
             return False
         elif shape.ShapeType == 'Wire':
@@ -269,7 +271,8 @@ class plane:
         if len(sex) == 0:
             return False
         elif len(sex) == 1:
-            if not sex[0].Object.isDerivedFrom("Part::Shape"):
+            if not sex[0].Object.isDerivedFrom("Part::Feature") \
+                or not sex[0].Object.Shape:
                 return False
             return self.alignToCurve(sex[0].Object.Shape, offset) \
                 or self.alignToFace(sex[0].Object.Shape, offset) \

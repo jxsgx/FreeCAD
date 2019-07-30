@@ -351,9 +351,9 @@ public:
             "makeThread(pitch,depth,height,radius) -- Make a thread with a given pitch, depth, height and radius"
         );
         add_varargs_method("makeRevolution",&Module::makeRevolution,
-            "makeRevolution(Curve,[vmin,vmax,angle,pnt,dir,shapetype]) -- Make a revolved shape\n"
+            "makeRevolution(Curve or Edge,[vmin,vmax,angle,pnt,dir,shapetype]) -- Make a revolved shape\n"
             "by rotating the curve or a portion of it around an axis given by (pnt,dir).\n"
-            "By default vmin/vmax=bounds of the curve,angle=360,pnt=Vector(0,0,0) and\n"
+            "By default vmin/vmax=bounds of the curve, angle=360, pnt=Vector(0,0,0),\n"
             "dir=Vector(0,0,1) and shapetype=Part.Solid"
         );
         add_varargs_method("makeRuledSurface",&Module::makeRuledSurface,
@@ -395,7 +395,7 @@ public:
             "Part.show(r[1][0])\n"
         );
         add_varargs_method("exportUnits",&Module::exportUnits,
-            "exportUnits([string=MM|M|IN]) -- Set units for exporting STEP/IGES files and returns the units."
+            "exportUnits([string=MM|M|INCH|FT|MI|KM|MIL|UM|CM|UIN]) -- Set units for exporting STEP/IGES files and returns the units."
         );
         add_varargs_method("setStaticValue",&Module::setStaticValue,
             "setStaticValue(string,string|int|float) -- Set a name to a value The value can be a string, int or float."
@@ -407,11 +407,17 @@ public:
             "getSortedClusters(list of edges) -- Helper method to sort and cluster a variety of edges"
         );
         add_varargs_method("__sortEdges__",&Module::sortEdges,
-            "__sortEdges__(list of edges) -- Helper method to sort an unsorted list of edges so that afterwards\n"
-            "two adjacent edges share a common vertex"
+            "__sortEdges__(list of edges) -- list of edges\n"
+            "Helper method to sort an unsorted list of edges so that afterwards\n"
+            "the start and end vertex of two consecutive edges are geometrically coincident.\n"
+            "It returns a single list of edges and the algorithm stops after the first set of\n"
+            "connected edges which means that the output list can be smaller than the input list.\n"
+            "The sorted list can be used to create a Wire."
         );
         add_varargs_method("sortEdges",&Module::sortEdges2,
-            "sortEdges(list of edges) -- Helper method to sort a list of edges into a list of list of connected edges"
+            "sortEdges(list of edges) -- list of lists of edges\n"
+            "It does basically the same as __sortEdges__ but sorts all input edges and thus returns\n"
+            "a list of lists of edges"
         );
         add_varargs_method("__toPythonOCC__",&Module::toPythonOCC,
             "__toPythonOCC__(shape) -- Helper method to convert an internal shape to pythonocc shape"
@@ -1312,55 +1318,65 @@ private:
         Handle(Geom_Curve) curve;
         union PyType_Object defaultType = {&Part::TopoShapeSolidPy::Type};
         PyObject* type = defaultType.o;
-        if (PyArg_ParseTuple(args.ptr(), "O!|dddO!O!O!", &(GeometryPy::Type), &pCrv,
-                                                   &vmin, &vmax, &angle,
-                                                   &(Base::VectorPy::Type), &pPnt,
-                                                   &(Base::VectorPy::Type), &pDir,
-                                                   &(PyType_Type), &type)) {
-            GeometryPy* pcGeo = static_cast<GeometryPy*>(pCrv);
-            curve = Handle(Geom_Curve)::DownCast
-                (pcGeo->getGeometryPtr()->handle());
-            if (curve.IsNull()) {
-                throw Py::Exception(PyExc_TypeError, "geometry is not a curve");
-            }
-            if (vmin == DBL_MAX)
-                vmin = curve->FirstParameter();
 
-            if (vmax == -DBL_MAX)
-                vmax = curve->LastParameter();
-        }
-        else {
+        do {
+            if (PyArg_ParseTuple(args.ptr(), "O!|dddO!O!O!", &(GeometryPy::Type), &pCrv,
+                                                       &vmin, &vmax, &angle,
+                                                       &(Base::VectorPy::Type), &pPnt,
+                                                       &(Base::VectorPy::Type), &pDir,
+                                                       &(PyType_Type), &type)) {
+                GeometryPy* pcGeo = static_cast<GeometryPy*>(pCrv);
+                curve = Handle(Geom_Curve)::DownCast
+                    (pcGeo->getGeometryPtr()->handle());
+                if (curve.IsNull()) {
+                    throw Py::Exception(PyExc_TypeError, "geometry is not a curve");
+                }
+                if (vmin == DBL_MAX)
+                    vmin = curve->FirstParameter();
+
+                if (vmax == -DBL_MAX)
+                    vmax = curve->LastParameter();
+                break;
+            }
+
             PyErr_Clear();
-            if (!PyArg_ParseTuple(args.ptr(), "O!|dddO!O!", &(TopoShapePy::Type), &pCrv,
-                &vmin, &vmax, &angle, &(Base::VectorPy::Type), &pPnt,
-                &(Base::VectorPy::Type), &pDir)) {
-                throw Py::Exception();
-            }
-            const TopoDS_Shape& shape = static_cast<TopoShapePy*>(pCrv)->getTopoShapePtr()->getShape();
-            if (shape.IsNull()) {
-                throw Py::Exception(PartExceptionOCCError, "shape is empty");
+            if (PyArg_ParseTuple(args.ptr(), "O!|dddO!O!O!", &(TopoShapePy::Type), &pCrv,
+                                                       &vmin, &vmax, &angle,
+                                                       &(Base::VectorPy::Type), &pPnt,
+                                                       &(Base::VectorPy::Type), &pDir,
+                                                       &(PyType_Type), &type)) {
+                const TopoDS_Shape& shape = static_cast<TopoShapePy*>(pCrv)->getTopoShapePtr()->getShape();
+                if (shape.IsNull()) {
+                    throw Py::Exception(PartExceptionOCCError, "shape is empty");
+                }
+
+                if (shape.ShapeType() != TopAbs_EDGE) {
+                    throw Py::Exception(PartExceptionOCCError, "shape is not an edge");
+                }
+
+                const TopoDS_Edge& edge = TopoDS::Edge(shape);
+                BRepAdaptor_Curve adapt(edge);
+
+                const Handle(Geom_Curve)& hCurve = adapt.Curve().Curve();
+                // Apply placement of the shape to the curve
+                TopLoc_Location loc = edge.Location();
+                curve = Handle(Geom_Curve)::DownCast(hCurve->Transformed(loc.Transformation()));
+                if (curve.IsNull()) {
+                    throw Py::Exception(PartExceptionOCCError, "invalid curve in edge");
+                }
+
+                if (vmin == DBL_MAX)
+                    vmin = adapt.FirstParameter();
+                if (vmax == -DBL_MAX)
+                    vmax = adapt.LastParameter();
+                break;
             }
 
-            if (shape.ShapeType() != TopAbs_EDGE) {
-                throw Py::Exception(PartExceptionOCCError, "shape is not an edge");
-            }
-
-            const TopoDS_Edge& edge = TopoDS::Edge(shape);
-            BRepAdaptor_Curve adapt(edge);
-
-            const Handle(Geom_Curve)& hCurve = adapt.Curve().Curve();
-            // Apply placement of the shape to the curve
-            TopLoc_Location loc = edge.Location();
-            curve = Handle(Geom_Curve)::DownCast(hCurve->Transformed(loc.Transformation()));
-            if (curve.IsNull()) {
-                throw Py::Exception(PartExceptionOCCError, "invalid curve in edge");
-            }
-
-            if (vmin == DBL_MAX)
-                vmin = adapt.FirstParameter();
-            if (vmax == -DBL_MAX)
-                vmax = adapt.LastParameter();
+            // invalid arguments
+            throw Py::TypeError("Expected arguments are:\n"
+                                "Curve or Edge, [float, float, float, Vector, Vector, ShapeType]");
         }
+        while(false);
 
         try {
             gp_Pnt p(0,0,0);
@@ -1730,16 +1746,11 @@ private:
             throw Py::Exception();
 
         if (unit) {
-            if (strcmp(unit,"M") == 0 || strcmp(unit,"MM") == 0 || strcmp(unit,"IN") == 0) {
-                if (!Interface_Static::SetCVal("write.iges.unit",unit)) {
-                    throw Py::RuntimeError("Failed to set 'write.iges.unit'");
-                }
-                if (!Interface_Static::SetCVal("write.step.unit",unit)) {
-                    throw Py::RuntimeError("Failed to set 'write.step.unit'");
-                }
+            if (!Interface_Static::SetCVal("write.iges.unit",unit)) {
+                throw Py::RuntimeError("Failed to set 'write.iges.unit'");
             }
-            else {
-                throw Py::ValueError("Wrong unit");
+            if (!Interface_Static::SetCVal("write.step.unit",unit)) {
+                throw Py::RuntimeError("Failed to set 'write.step.unit'");
             }
         }
 
